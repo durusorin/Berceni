@@ -852,6 +852,7 @@
   let map = null, mapLayers = {}, meMarker = null, meLine = null, lastMeLatLng = null;
   let tickTimer = null;
   let reminderFiredFor = null, reminderFiredDate = null;
+  let calendarBlobUrl = null;
   let audioCtx = null;
 
   const $ = (sel) => document.querySelector(sel);
@@ -1173,7 +1174,13 @@
       'END:VCALENDAR'
     ].join('\r\n');
 
-    link.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+    // iOS Safari blocks top-level navigation to plain data: URIs on a lot of versions —
+    // a Blob object URL is treated as a normal same-origin resource and reliably triggers
+    // the native "Add to Calendar" sheet instead of doing nothing.
+    if (calendarBlobUrl) URL.revokeObjectURL(calendarBlobUrl);
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    calendarBlobUrl = URL.createObjectURL(blob);
+    link.href = calendarBlobUrl;
   }
 
   function updateDestLabels(){
