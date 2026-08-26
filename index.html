@@ -27,6 +27,7 @@
     --route-main:#C1443E;
     --route-continue:#8A6BC7;
     --stop-blue:#4FC3E8;
+    --route-orange:#FF9F43;
     --line:#DDD8C9;
     --muted:#726C5E;
     --shadow: 0 1px 2px rgba(20,33,61,0.06), 0 8px 24px -12px rgba(20,33,61,0.25);
@@ -259,12 +260,38 @@
   .next-line-tag.l438{background:rgba(42,127,118,0.4); color:#BEEFE8;}
   .hero .meta{
     margin-top:10px;
-    font-size:14px;
-    color:#C9CEDA;
+    font-size:17px;
+    font-weight:700;
+    color:var(--route-orange);
     display:flex;
     justify-content:space-between;
     gap:8px;
     flex-wrap:wrap;
+  }
+  .meta-route{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex:1;
+    width:100%;
+  }
+  .meta-arrow-line{
+    flex:1;
+    min-width:28px;
+    height:0;
+    border-top:2px dashed var(--route-orange);
+    position:relative;
+    margin:0 6px;
+  }
+  .meta-arrow-line::after{
+    content:"";
+    position:absolute;
+    right:-1px;
+    top:50%;
+    transform:translateY(-50%);
+    border-left:7px solid var(--route-orange);
+    border-top:5px solid transparent;
+    border-bottom:5px solid transparent;
   }
   .hero .meta b{color:#fff; font-weight:600;}
   .daytype-tag{
@@ -298,13 +325,26 @@
   .leave-row.green{background:rgba(46,139,87,0.35); color:#C7F2D9;}
   .leave-row.amber{background:rgba(201,138,27,0.35); color:#FFE3B0;}
   .leave-row.red{background:rgba(214,40,40,0.35); color:#FFD0D0;}
-  .leave-detail .leave-home{margin-left:auto; opacity:0.75; font-weight:500; font-size:14px;}
+  .leave-detail .leave-home{opacity:0.75; font-weight:500; font-size:14px; width:100%;}
+  .calendar-link{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    margin-top:4px;
+    font-size:13px;
+    font-weight:600;
+    color:inherit;
+    text-decoration:underline;
+    text-underline-offset:2px;
+    opacity:0.9;
+  }
   .arrival-row{
     margin-top:8px;
     display:flex;
     align-items:center;
+    justify-content:space-between;
     flex-wrap:wrap;
-    gap:6px 8px;
+    gap:6px 10px;
     padding:9px 12px;
     border-radius:12px;
     font-size:15.5px;
@@ -312,8 +352,11 @@
     background:rgba(255,255,255,0.1);
     color:#E4E7EF;
   }
-  .arrival-row .leave-label{opacity:0.85; font-weight:500;}
-  .arrival-row .leave-home{margin-left:auto; opacity:0.7; font-weight:500; font-size:14px;}
+  .arrival-time-main{
+    color:var(--stop-blue);
+    font-weight:700;
+    font-size:18px;
+  }
 
   .section-title{
     font-family:'Oswald',sans-serif;
@@ -737,12 +780,15 @@
       <div class="next-line-tag" id="nextLineTag"></div>
     </div>
     <div class="meta">
-      <span id="stopNameLabel">—</span>
+      <span class="meta-route">
+        <span id="stopNameLabel">—</span>
+        <span class="meta-arrow-line"></span>
+        <span id="metaDestLabel">—</span>
+      </span>
     </div>
     <div class="arrival-row" id="arrivalRow">
-      <span class="leave-label">Sosire</span>
-      <span id="arrivalTime">--:--</span>
-      <span class="leave-home" id="arrivalDuration"></span>
+      <span id="arrivalDuration">—</span>
+      <span class="arrival-time-main">Sosire <span id="arrivalTime">--:--</span></span>
     </div>
     <div class="leave-row" id="leaveRow">
       <div class="leave-status" id="leaveStatus">—</div>
@@ -751,6 +797,7 @@
         <span id="leaveTime">--:--</span>
         <span class="leave-home" id="leaveHomeLabel"></span>
       </div>
+      <a class="calendar-link" id="calendarLink" href="#">🔔 Adaugă memento în Calendar</a>
     </div>
   </div>
 
@@ -977,6 +1024,10 @@
     return currentDir === 'outbound' ? 'Piața Sudului' : destOption().displayName;
   }
 
+  function otherEndLabel(){
+    return currentDir === 'outbound' ? destOption().displayName : 'Piața Sudului';
+  }
+
   function originCoords(){
     return currentDir === 'outbound' ? SEGMENT_DATA.lines[0].piataSudului : destOption();
   }
@@ -1078,6 +1129,53 @@
     return pad2(Math.floor(m/60)) + ':' + pad2(m%60);
   }
 
+  // ---------- calendar reminder (.ics) — no server needed, uses iOS Calendar's own notifications ----------
+  function icsDateTime(date){
+    return date.getFullYear() + pad2(date.getMonth() + 1) + pad2(date.getDate())
+      + 'T' + pad2(date.getHours()) + pad2(date.getMinutes()) + '00';
+  }
+
+  function updateCalendarLink(active, leaveMfm, walkMin, home){
+    const link = $('#calendarLink');
+    if (!active){ link.style.display = 'none'; return; }
+    link.style.display = '';
+
+    const now = new Date();
+    const wrappedMfm = ((leaveMfm % 1440) + 1440) % 1440;
+    const startDate = new Date(now);
+    startDate.setHours(Math.floor(wrappedMfm / 60), wrappedMfm % 60, 0, 0);
+    if (leaveMfm >= 1440) startDate.setDate(startDate.getDate() + 1); // rare day-wrap safety
+    const endDate = new Date(startDate.getTime() + 5 * 60000);
+
+    const origin = stopLabel();
+    const dest = otherEndLabel();
+    const summary = 'Pleacă spre autobuz ' + active.line + ' (' + origin + ' → ' + dest + ')';
+    const description = 'Autobuzul linia ' + active.line + ' vine la ' + active.label + ' din ' + origin
+      + '. De la ' + home.label + ' îți ia ~' + formatMinutes(walkMin) + ' pe jos.';
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Calatorii//RO',
+      'BEGIN:VEVENT',
+      'UID:' + Date.now() + '@calatorii',
+      'DTSTAMP:' + icsDateTime(now) + 'Z',
+      'DTSTART:' + icsDateTime(startDate),
+      'DTEND:' + icsDateTime(endDate),
+      'SUMMARY:' + summary,
+      'DESCRIPTION:' + description,
+      'BEGIN:VALARM',
+      'TRIGGER:PT0M',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Pleacă acum!',
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    link.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  }
+
   function updateDestLabels(){
     // headerTitle is fixed app branding ("Berceni City"); only the direction button
     // reflects the actually-selected stop, since that's what matters functionally
@@ -1107,6 +1205,7 @@
     const deps = mergedDepartures(dayType).filter(d => d.mfm >= nowMfm);
 
     $('#stopNameLabel').textContent = 'din ' + stopLabel();
+    $('#metaDestLabel').textContent = otherEndLabel();
     const gFrom = originCoords();
     const gTo = currentDir === 'outbound' ? destOption() : SEGMENT_DATA.lines[0].piataSudului;
     $('#gmapsLink').href = `https://www.google.com/maps/dir/?api=1&origin=${gFrom.lat},${gFrom.lon}&destination=${gTo.lat},${gTo.lon}&travelmode=transit`;
@@ -1143,8 +1242,7 @@
           $('#arrivalTime').textContent = arrival.label;
           let durationMin = arrival.mfm - active.mfm;
           if (durationMin < 0) durationMin += 1440;
-          const arrivalPlace = currentDir === 'outbound' ? destOption().displayName : 'Piața Sudului';
-          $('#arrivalDuration').textContent = '(' + arrivalPlace + ', ~' + formatMinutes(durationMin) + ' pe drum)';
+          $('#arrivalDuration').textContent = '~' + formatMinutes(durationMin) + ' pe drum';
         } else {
           arrivalRow.style.display = 'none';
         }
@@ -1155,6 +1253,7 @@
         const leaveRow = $('#leaveRow');
         if (diff <= 0){
           leaveRow.style.display = 'none';
+          $('#calendarLink').style.display = 'none';
         } else {
           leaveRow.style.display = '';
           $('#leaveTime').textContent = mfmToLabel(leaveMfm);
@@ -1165,12 +1264,14 @@
           $('#leaveStatus').textContent = tier === 'green' ? '🟢 Poți pleca liniștit'
             : tier === 'amber' ? '🟡 E timpul să te pregătești'
             : '🔴 Pleacă acum!';
+          updateCalendarLink(active, leaveMfm, walkMin, home);
         }
       } else {
         nextTimeEl.textContent = '—:—';
         etaEl.textContent = 'niciun autobuz azi';
         tagEl.style.display = 'none';
         $('#arrivalRow').style.display = 'none';
+        $('#calendarLink').style.display = 'none';
         $('#leaveRow').style.display = 'none';
       }
       nextTimeEl.classList.remove('updating');
