@@ -232,7 +232,7 @@
   .flip-time{
     font-family:'IBM Plex Mono',monospace;
     font-weight:700;
-    font-size:48px;
+    font-size:80px;
     letter-spacing:0.5px;
     line-height:1;
     transition:opacity .25s ease, transform .25s ease;
@@ -241,18 +241,18 @@
   .eta{
     font-family:'Oswald',sans-serif;
     font-weight:600;
-    font-size:15px;
+    font-size:20px;
     color:#FFD8D8;
     background:rgba(214,40,40,0.35);
-    padding:4px 10px 5px;
+    padding:5px 12px 6px;
     border-radius:999px;
     white-space:nowrap;
   }
   .next-line-tag{
     font-family:'Oswald',sans-serif;
     font-weight:700;
-    font-size:18px;
-    padding:6px 12px 7px;
+    font-size:22px;
+    padding:7px 14px 8px;
     border-radius:999px;
     white-space:nowrap;
   }
@@ -856,6 +856,34 @@
   let audioCtx = null;
 
   const $ = (sel) => document.querySelector(sel);
+
+  // ---------- Preferences persistence (per-device, via localStorage) ----------
+  const PREFS_KEY = 'stbPrefs_v1';
+
+  function loadPrefs(){
+    try {
+      const raw = localStorage.getItem(PREFS_KEY);
+      if (!raw) return;
+      const prefs = JSON.parse(raw);
+      if (prefs.currentDir === 'outbound' || prefs.currentDir === 'inbound'){
+        currentDir = prefs.currentDir;
+      }
+      if (typeof prefs.selectedDestKey === 'string' &&
+          SEGMENT_DATA.stopOptions.some(o => o.key === prefs.selectedDestKey)){
+        selectedDestKey = prefs.selectedDestKey;
+      }
+    } catch (e) {
+      // localStorage unavailable (private mode edge cases) — just use defaults
+    }
+  }
+
+  function savePrefs(){
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ currentDir, selectedDestKey }));
+    } catch (e) {
+      // ignore — persistence is a nice-to-have
+    }
+  }
 
   // ---------- Romanian legal holidays (Codul Muncii art. 139) ----------
   const FIXED_HOLIDAYS = [
@@ -1654,6 +1682,7 @@
         currentDir = btn.dataset.dir;
         pinnedDeparture = null;
         document.querySelectorAll('#dirSwitch button').forEach(b => b.classList.toggle('active', b === btn));
+        savePrefs();
         render();
         if (map) buildDynamicMapLayers();
         updateMeLineForCurrentDir();
@@ -1677,6 +1706,7 @@
     $('#altStopSelect').addEventListener('change', (e) => {
       selectedDestKey = e.target.value;
       pinnedDeparture = null;
+      savePrefs();
       updateDestLabels();
       render();
       if (map) buildDynamicMapLayers();
@@ -1744,6 +1774,10 @@
   }
 
   try {
+    loadPrefs();
+    document.querySelectorAll('#dirSwitch button').forEach(b => {
+      b.classList.toggle('active', b.dataset.dir === currentDir);
+    });
     populateAltStopSelect();
     updateDestLabels();
     wireEvents();
@@ -1758,6 +1792,14 @@
   }
 
 })();
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
 </script>
 </body>
 </html>
