@@ -86,8 +86,8 @@
     display:flex;
     align-items:center;
     gap:12px;
-    padding:14px 16px calc(14px + env(safe-area-inset-top,0px));
-    padding-top:calc(14px + env(safe-area-inset-top,0px));
+    padding:10px 16px 10px;
+    padding-top:calc(10px + env(safe-area-inset-top,0px));
     background:var(--ink);
     color:#fff;
     position:sticky;
@@ -140,6 +140,10 @@
     font-size:12px;
     color:#8890A6;
     margin-top:1px;
+  }
+  .topbar-clock .daytype-tag{
+    display:inline-block;
+    margin-top:3px;
   }
 
   main{
@@ -707,6 +711,7 @@
   <div class="topbar-clock">
     <div class="time" id="clockNow">--:--</div>
     <div class="date" id="clockDate">--</div>
+    <span class="daytype-tag" id="dayTag">—</span>
   </div>
 </header>
 
@@ -733,7 +738,6 @@
     </div>
     <div class="meta">
       <span id="stopNameLabel">—</span>
-      <span class="daytype-tag" id="dayTag">—</span>
     </div>
     <div class="arrival-row" id="arrivalRow">
       <span class="leave-label">Sosire</span>
