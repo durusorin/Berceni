@@ -95,37 +95,40 @@
     top:0;
     z-index:50;
   }
-  .badge{
-    background:var(--red);
-    color:#fff;
-    font-family:'Oswald',sans-serif;
-    font-weight:700;
-    font-size:18px;
-    letter-spacing:0.5px;
-    padding:4px 10px 5px;
-    border-radius:8px;
+  .header-status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:0;
+    flex:1 1 auto;
+    overflow:hidden;
+  }
+  .hs-tier{
+    font-size:19px;
     line-height:1;
-    box-shadow: 0 2px 0 rgba(0,0,0,0.15) inset;
     flex-shrink:0;
   }
-  .topbar-title{
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-    min-width:0;
-  }
-  .topbar-title .r1{
+  .hs-line{
     font-family:'Oswald',sans-serif;
-    font-weight:600;
-    font-size:19px;
+    font-weight:700;
+    font-size:15px;
     letter-spacing:0.3px;
+    padding:3px 8px 4px;
+    border-radius:7px;
+    color:#fff;
+    line-height:1;
+    flex-shrink:0;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.15) inset;
+  }
+  .hs-line.l475{ background:var(--red); }
+  .hs-line.l438{ background:var(--teal); }
+  .hs-eta{
+    font-size:16px;
+    font-weight:600;
+    color:#C9CEDA;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-  }
-  .topbar-title .r2{
-    font-size:14.5px;
-    color:#C9CEDA;
   }
   .topbar-clock{
     margin-left:auto;
@@ -850,10 +853,8 @@
 </div>
 
 <header class="topbar">
-  <div class="badge">🚌</div>
-  <div class="topbar-title">
-    <div class="r1">Piața Sudului ⇄ Berceni City</div>
-    <div class="r2">Liniile 438 &amp; 475</div>
+  <div class="header-status" id="headerStatus">
+    <span class="hs-eta">—</span>
   </div>
   <div class="topbar-clock" id="topbarClock">
     <div class="time" id="clockNow">--:--</div>
@@ -1461,6 +1462,30 @@
     checkReminder(active, nowMfm);
     updateClockHands(active);
     updateClockSidePills(deps, active);
+    updateHeaderStatus(active, nowMfm);
+  }
+
+  // sticky live status shown in the header, next to the clock — stays visible
+  // while scrolling, unlike the hero card which scrolls out of view
+  function updateHeaderStatus(active, nowMfm){
+    const wrap = $('#headerStatus');
+    if (!wrap) return;
+    if (!active){
+      wrap.innerHTML = '<span class="hs-eta">— Niciun autobuz azi</span>';
+      return;
+    }
+    const diff = active.mfm - nowMfm;
+    if (diff <= 0){
+      wrap.innerHTML = '<span class="hs-line l' + active.line + '">' + active.line + '</span><span class="hs-eta">a trecut</span>';
+      return;
+    }
+    const { minutes: walkMin } = walkMinutesForCurrentTrip();
+    const leaveMfm = active.mfm - walkMin;
+    const diffToLeave = leaveMfm - nowMfm;
+    const tier = diffToLeave > 10 ? 'green' : diffToLeave >= 0 ? 'amber' : 'red';
+    const tierEmoji = tier === 'green' ? '🟢' : tier === 'amber' ? '🟡' : '🔴';
+    wrap.innerHTML = '<span class="hs-tier">' + tierEmoji + '</span><span class="hs-line l' + active.line + '">'
+      + active.line + '</span><span class="hs-eta">peste ' + formatMinutes(diff) + '</span>';
   }
 
   function depKey(d){ return d.mfm + '_' + d.line; }
