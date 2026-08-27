@@ -117,14 +117,14 @@
   .topbar-title .r1{
     font-family:'Oswald',sans-serif;
     font-weight:600;
-    font-size:17px;
+    font-size:19px;
     letter-spacing:0.3px;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
   }
   .topbar-title .r2{
-    font-size:13px;
+    font-size:14.5px;
     color:#C9CEDA;
   }
   .topbar-clock{
@@ -134,11 +134,11 @@
   }
   .topbar-clock .time{
     font-family:'IBM Plex Mono',monospace;
-    font-size:15px;
+    font-size:16.5px;
     color:#C9CEDA;
   }
   .topbar-clock .date{
-    font-size:12px;
+    font-size:13.5px;
     color:#8890A6;
     margin-top:1px;
   }
@@ -168,7 +168,7 @@
     padding:12px 6px;
     font-family:'Work Sans',sans-serif;
     font-weight:600;
-    font-size:15px;
+    font-size:16.5px;
     line-height:1.25;
     color:var(--ink-soft);
     border-radius:9px;
@@ -200,7 +200,7 @@
     pointer-events:none;
   }
   .hero .eyebrow{
-    font-size:12px;
+    font-size:13px;
     letter-spacing:1.2px;
     text-transform:uppercase;
     color:#B9C2D6;
@@ -220,8 +220,50 @@
     color:#8890A6;
     text-transform:none;
     letter-spacing:0;
-    font-size:11.5px;
+    font-size:12.5px;
   }
+  .skip-note{
+    display:none;
+    margin-top:8px;
+    font-size:12.5px;
+    font-style:italic;
+    color:#FFD8D8;
+    line-height:1.4;
+  }
+  .analog-clock-wrap{
+    display:flex;
+    justify-content:center;
+    margin-top:10px;
+  }
+  #analogClock{
+    width:190px;
+    height:190px;
+  }
+  .clock-face{
+    fill:var(--paper);
+    stroke:rgba(0,0,0,0.15);
+    stroke-width:1;
+  }
+  .clock-tick{
+    stroke:var(--ink-soft);
+  }
+  .clock-tick.major{stroke-width:2.5;}
+  .clock-tick.minor{stroke-width:1; opacity:0.5;}
+  .clock-number{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    fill:var(--ink);
+    text-anchor:middle;
+    dominant-baseline:central;
+  }
+  .clock-hand{
+    stroke:var(--ink);
+    stroke-linecap:round;
+  }
+  .clock-hand.hour{stroke-width:5;}
+  .clock-hand.minute{stroke-width:3.5; stroke:var(--ink-soft);}
+  .clock-center{fill:var(--red);}
   .flipwrap{
     display:flex;
     align-items:baseline;
@@ -232,7 +274,7 @@
   .flip-time{
     font-family:'IBM Plex Mono',monospace;
     font-weight:700;
-    font-size:48px;
+    font-size:52px;
     letter-spacing:0.5px;
     line-height:1;
     transition:opacity .25s ease, transform .25s ease;
@@ -241,7 +283,7 @@
   .eta{
     font-family:'Oswald',sans-serif;
     font-weight:600;
-    font-size:15px;
+    font-size:17px;
     color:#FFD8D8;
     background:rgba(214,40,40,0.35);
     padding:4px 10px 5px;
@@ -251,7 +293,7 @@
   .next-line-tag{
     font-family:'Oswald',sans-serif;
     font-weight:700;
-    font-size:18px;
+    font-size:19px;
     padding:6px 12px 7px;
     border-radius:999px;
     white-space:nowrap;
@@ -260,7 +302,7 @@
   .next-line-tag.l438{background:rgba(42,127,118,0.4); color:#BEEFE8;}
   .hero .meta{
     margin-top:10px;
-    font-size:17px;
+    font-size:18.5px;
     font-weight:700;
     color:var(--route-orange);
     display:flex;
@@ -295,7 +337,7 @@
   }
   .hero .meta b{color:#fff; font-weight:600;}
   .daytype-tag{
-    font-size:14px;
+    font-size:15px;
     font-weight:600;
     padding:3px 9px;
     border-radius:999px;
@@ -310,7 +352,7 @@
     border-radius:14px;
   }
   .leave-status{
-    font-size:19px;
+    font-size:20px;
     font-weight:700;
   }
   .leave-detail{
@@ -318,20 +360,20 @@
     align-items:center;
     flex-wrap:wrap;
     gap:6px 8px;
-    font-size:15.5px;
+    font-size:16.5px;
     font-weight:600;
   }
-  .leave-detail .leave-label{opacity:0.85; font-weight:500;}
+  .leave-detail .leave-label{opacity:0.95; font-weight:600;}
   .leave-row.green{background:rgba(46,139,87,0.35); color:#C7F2D9;}
   .leave-row.amber{background:rgba(201,138,27,0.35); color:#FFE3B0;}
   .leave-row.red{background:rgba(214,40,40,0.35); color:#FFD0D0;}
-  .leave-detail .leave-home{opacity:0.75; font-weight:500; font-size:14px; width:100%;}
+  .leave-detail .leave-home{opacity:0.9; font-weight:600; font-size:15px; width:100%;}
   .calendar-link{
     display:inline-flex;
     align-items:center;
     gap:6px;
     margin-top:4px;
-    font-size:13px;
+    font-size:14.5px;
     font-weight:600;
     color:inherit;
     text-decoration:underline;
@@ -347,7 +389,7 @@
     gap:6px 10px;
     padding:9px 12px;
     border-radius:12px;
-    font-size:15.5px;
+    font-size:16.5px;
     font-weight:600;
     background:rgba(255,255,255,0.1);
     color:#E4E7EF;
@@ -355,13 +397,13 @@
   .arrival-time-main{
     color:var(--stop-blue);
     font-weight:700;
-    font-size:18px;
+    font-size:19px;
   }
 
   .section-title{
     font-family:'Oswald',sans-serif;
     font-weight:600;
-    font-size:14.5px;
+    font-size:15.5px;
     letter-spacing:0.6px;
     text-transform:uppercase;
     color:var(--muted);
@@ -371,7 +413,7 @@
     align-items:center;
   }
   .section-hint{
-    font-size:13px;
+    font-size:14.5px;
     color:var(--muted);
     margin:0 4px 8px;
   }
@@ -382,7 +424,7 @@
     border:none;
     background:transparent;
     padding:2px 0;
-    font-size:13px;
+    font-size:14.5px;
     color:var(--muted);
     text-decoration:underline;
     text-underline-offset:2px;
@@ -403,12 +445,12 @@
     border-radius:8px;
     padding:8px;
     font-family:'Work Sans',sans-serif;
-    font-size:15px;
+    font-size:16.5px;
     color:var(--ink);
     background:#fff;
   }
   .approx-note{
-    font-size:12px;
+    font-size:13px;
     opacity:0.7;
   }
   .dep-select-row{
@@ -422,7 +464,7 @@
     margin-bottom:12px;
   }
   .dep-select-row label{
-    font-size:12.5px;
+    font-size:13.5px;
     text-transform:uppercase;
     letter-spacing:0.6px;
     color:var(--muted);
@@ -435,7 +477,7 @@
     background:transparent;
     font-family:'IBM Plex Mono',monospace;
     font-weight:600;
-    font-size:18px;
+    font-size:19px;
     color:var(--ink);
     padding:6px 0;
   }
@@ -453,7 +495,7 @@
   .chip{
     font-family:'IBM Plex Mono',monospace;
     font-weight:700;
-    font-size:18px;
+    font-size:19px;
     padding:11px 14px;
     border-radius:10px;
     background:var(--card);
@@ -471,7 +513,7 @@
   .chip:active{transform:scale(0.96);}
   .chip .ltag{
     font-family:'Oswald',sans-serif;
-    font-size:11.5px;
+    font-size:12.5px;
     font-weight:700;
     padding:2px 6px;
     border-radius:5px;
@@ -487,7 +529,7 @@
   .chip.active .ltag{background:rgba(255,255,255,0.28);}
   .chip.pinned{border-color:var(--ink);}
   .empty-note{
-    font-size:15.5px;
+    font-size:16.5px;
     color:var(--muted);
     background:var(--card);
     border-radius:14px;
@@ -503,11 +545,11 @@
   }
   .fallback-title{
     font-weight:700;
-    font-size:15.5px;
+    font-size:16.5px;
     margin-bottom:2px;
   }
   .fallback-sub{
-    font-size:13.5px;
+    font-size:14.5px;
     color:var(--muted);
     margin-bottom:10px;
   }
@@ -521,7 +563,7 @@
     padding:10px;
     border-radius:10px;
     font-weight:700;
-    font-size:15px;
+    font-size:16.5px;
     text-decoration:none;
   }
   .fallback-btn.uber{background:#000; color:#fff;}
@@ -544,7 +586,7 @@
     justify-content:space-between;
     font-family:'Oswald',sans-serif;
     font-weight:600;
-    font-size:15.5px;
+    font-size:16.5px;
     letter-spacing:0.3px;
     color:var(--ink);
     cursor:pointer;
@@ -563,7 +605,7 @@
     display:flex;
     gap:14px;
     padding:10px 14px 0;
-    font-size:13px;
+    font-size:14.5px;
     color:var(--muted);
     flex-wrap:wrap;
   }
@@ -572,7 +614,7 @@
   .swatch.dot{width:8px;height:8px;border-radius:50%;}
   #locateInfo{
     padding:8px 14px 14px;
-    font-size:13px;
+    font-size:14.5px;
     color:var(--muted);
     line-height:1.4;
   }
@@ -581,7 +623,7 @@
     padding:0 14px 14px;
   }
   .gmaps-link-row a{
-    font-size:13.5px;
+    font-size:14.5px;
     font-weight:600;
     color:var(--ink-soft);
     text-decoration:underline;
@@ -638,7 +680,7 @@
   .stop-tooltip{
     font-family:'Work Sans',sans-serif;
     font-weight:600;
-    font-size:12.5px;
+    font-size:14px;
     background:var(--ink);
     color:#fff;
     border:none;
@@ -693,7 +735,7 @@
   .credit{
     margin-top:18px;
     padding:0 6px;
-    font-size:12.5px;
+    font-size:13.5px;
     color:var(--muted);
     opacity:0.7;
     text-align:center;
@@ -702,7 +744,7 @@
     display:inline-flex;
     align-items:center;
     gap:6px;
-    font-size:14px;
+    font-size:15px;
     font-weight:600;
     padding:7px 12px;
     border-radius:999px;
@@ -729,7 +771,7 @@
     margin:4px 6px 4px 0;
   }
 
-  .leaflet-popup-content{font-family:'Work Sans',sans-serif; font-size:14.5px;}
+  .leaflet-popup-content{font-family:'Work Sans',sans-serif; font-size:16px;}
 
   @media (prefers-reduced-motion: reduce){
     .flip-time{transition:none;}
@@ -774,6 +816,18 @@
 
   <div class="hero">
     <div class="eyebrow"><span class="dot"></span> <span id="heroTitle">Următorul autobuz</span><span class="pin-hint" id="pinHint"></span></div>
+    <div class="skip-note" id="skipNote"></div>
+    <div class="analog-clock-wrap">
+      <svg id="analogClock" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <circle class="clock-face" cx="100" cy="100" r="92"/>
+        <g id="clockTicks"></g>
+        <g id="clockNumbers"></g>
+        <g id="clockBusMarkers"></g>
+        <line id="clockHourHand" class="clock-hand hour" x1="100" y1="100" x2="100" y2="60"/>
+        <line id="clockMinHand" class="clock-hand minute" x1="100" y1="100" x2="100" y2="40"/>
+        <circle class="clock-center" cx="100" cy="100" r="5"/>
+      </svg>
+    </div>
     <div class="flipwrap">
       <div class="flip-time mono" id="nextTime">--:--</div>
       <div class="eta" id="nextEta">—</div>
@@ -845,6 +899,7 @@
   const WALK_SPEED_KMH = 4.5;
   const DETOUR_FACTOR = 1.3;
   const DEFAULT_DEST_KEY = 'COFETARIE';
+  const MIN_CATCHABLE_MIN = 10; // buses closer than this aren't realistically catchable, skip them for the auto pick
 
   let currentDir = 'outbound'; // 'outbound' = spre dest (board at Piata Sudului); 'inbound' = spre Piata Sudului (board at dest)
   let selectedDestKey = DEFAULT_DEST_KEY;
@@ -1220,10 +1275,19 @@
     $('#dayTag').textContent = holidayInfo ? holidayInfo.name : DAY_LABELS[dayType];
     $('#depTitle').textContent = 'Plecări rămase azi · ' + stopLabel();
 
-    const autoNext = deps[0];
+    const tooSoon = deps[0] && (deps[0].mfm - nowMfm) < MIN_CATCHABLE_MIN ? deps[0] : null;
+    const autoNext = deps.find(d => d.mfm - nowMfm >= MIN_CATCHABLE_MIN) || deps[0];
     const active = pinnedDeparture && deps.some(d => d.mfm === pinnedDeparture.mfm && d.line === pinnedDeparture.line)
       ? pinnedDeparture
       : autoNext;
+
+    const skipNoteEl = $('#skipNote');
+    if (!pinnedDeparture && tooSoon && autoNext && autoNext.mfm !== tooSoon.mfm){
+      skipNoteEl.style.display = '';
+      skipNoteEl.textContent = 'Autobuzul de la ' + tooSoon.label + ' e prea aproape ca să-l prinzi — următorul posibil: ' + autoNext.label + '.';
+    } else {
+      skipNoteEl.style.display = 'none';
+    }
 
     $('#heroTitle').textContent = pinnedDeparture ? 'Autobuz selectat' : 'Următorul autobuz';
     $('#pinHint').textContent = pinnedDeparture ? '(atinge din nou ca să revii la automat)' : '';
@@ -1318,6 +1382,7 @@
     updateMapSelection();
     updateBusPositionMarker(active, nowMfm);
     checkReminder(active, nowMfm);
+    updateClockBusMarkers(deps, active);
   }
 
   function depKey(d){ return d.mfm + '_' + d.line; }
@@ -1342,6 +1407,74 @@
     const now = new Date();
     $('#clockNow').textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
     $('#clockDate').textContent = DAY_NAMES_SHORT[now.getDay()] + ', ' + now.getDate() + ' ' + MONTH_NAMES[now.getMonth()];
+  }
+
+  // ---------- analog clock ----------
+  const CLOCK_CX = 100, CLOCK_CY = 100;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function clockPolar(r, angleDeg){
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    return [CLOCK_CX + r * Math.cos(rad), CLOCK_CY + r * Math.sin(rad)];
+  }
+
+  function buildClockFace(){
+    const ticksG = document.getElementById('clockTicks');
+    const numsG = document.getElementById('clockNumbers');
+    if (!ticksG || !numsG || ticksG.childNodes.length) return; // build once
+    for (let m = 0; m < 60; m++){
+      const angle = m * 6;
+      const isMajor = m % 5 === 0;
+      const [x1, y1] = clockPolar(isMajor ? 78 : 84, angle);
+      const [x2, y2] = clockPolar(90, angle);
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('class', 'clock-tick ' + (isMajor ? 'major' : 'minor'));
+      ticksG.appendChild(line);
+    }
+    for (let h = 1; h <= 12; h++){
+      const [x, y] = clockPolar(65, h * 30);
+      const text = document.createElementNS(SVG_NS, 'text');
+      text.setAttribute('x', x); text.setAttribute('y', y);
+      text.setAttribute('class', 'clock-number');
+      text.textContent = h;
+      numsG.appendChild(text);
+    }
+  }
+
+  function updateClockHands(){
+    const hourHand = document.getElementById('clockHourHand');
+    const minHand = document.getElementById('clockMinHand');
+    if (!hourHand || !minHand) return;
+    const now = new Date();
+    const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
+    const [hx, hy] = clockPolar(50, h * 30 + m * 0.5);
+    const [mx, my] = clockPolar(72, m * 6 + s * 0.1);
+    hourHand.setAttribute('x2', hx); hourHand.setAttribute('y2', hy);
+    minHand.setAttribute('x2', mx); minHand.setAttribute('y2', my);
+  }
+
+  function updateClockBusMarkers(deps, active){
+    const g = document.getElementById('clockBusMarkers');
+    if (!g) return;
+    g.innerHTML = '';
+    deps.slice(0, 6).forEach(d => {
+      const hour = Math.floor(d.mfm / 60) % 12;
+      const min = d.mfm % 60;
+      const [x, y] = clockPolar(90, hour * 30 + min * 0.5);
+      const isActive = active && d.mfm === active.mfm && d.line === active.line;
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+      dot.setAttribute('r', isActive ? 7 : 4);
+      dot.setAttribute('fill', isActive ? getVar(d.line === '475' ? '--red' : '--teal') : getVar('--muted'));
+      dot.setAttribute('opacity', isActive ? '1' : '0.35');
+      if (isActive){
+        dot.setAttribute('stroke', '#fff');
+        dot.setAttribute('stroke-width', '2');
+      }
+      g.appendChild(dot);
+    });
   }
 
   function dedupeStops(lists){
@@ -1747,9 +1880,12 @@
     populateAltStopSelect();
     updateDestLabels();
     wireEvents();
+    buildClockFace();
+    updateClockHands();
     render();
     tickClock();
     tickTimer = setInterval(() => { tickClock(); render(); }, 15000);
+    setInterval(updateClockHands, 1000);
     renderWeekendNotice();
     loadWeather();
   } catch (err) {
