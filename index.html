@@ -455,6 +455,14 @@
     text-underline-offset:2px;
     opacity:0.9;
   }
+  .share-eta-btn{
+    border:none;
+    background:none;
+    font-family:inherit;
+    padding:0;
+    cursor:pointer;
+  }
+  .share-eta-btn.copied{opacity:1; color:#C7F2D9;}
   .arrival-row{
     margin-top:8px;
     display:flex;
@@ -954,6 +962,7 @@
         <span class="leave-home" id="leaveHomeLabel"></span>
       </div>
       <a class="calendar-link" id="calendarLink" href="#">🔔 Adaugă memento în Calendar</a>
+      <button class="calendar-link share-eta-btn" id="shareEtaBtn">📤 Trimite ETA</button>
     </div>
   </div>
 
@@ -1043,6 +1052,7 @@
   let meLineRequestId = 0;
   let bikeRouteLayer = null;
   let audioCtx = null;
+  let shareEtaText = '';
 
   const $ = (sel) => document.querySelector(sel);
 
@@ -1493,6 +1503,7 @@
         if (diff <= 0){
           leaveRow.style.display = 'none';
           $('#calendarLink').style.display = 'none';
+          $('#shareEtaBtn').style.display = 'none';
         } else {
           leaveRow.style.display = '';
           $('#leaveTime').textContent = mfmToLabel(leaveMfm);
@@ -1504,6 +1515,10 @@
             : tier === 'amber' ? '🟡 E timpul să te pregătești'
             : '🔴 Pleacă acum!';
           updateCalendarLink(active, leaveMfm, walkMin, home);
+
+          $('#shareEtaBtn').style.display = 'inline-flex';
+          shareEtaText = 'Prind autobuzul ' + active.line + ' de la ' + stopLabel() + ' (vine la ' + active.label + ')'
+            + (arrival ? ', ajung la ' + otherEndLabel() + ' pe la ' + arrival.label + '.' : '.');
         }
       } else {
         nextTimeEl.textContent = '—:—';
@@ -1512,6 +1527,7 @@
         $('#arrivalRow').style.display = 'none';
         $('#calendarLink').style.display = 'none';
         $('#leaveRow').style.display = 'none';
+        $('#shareEtaBtn').style.display = 'none';
       }
       nextTimeEl.classList.remove('updating');
     }, 120);
@@ -2104,6 +2120,24 @@
   function wireEvents(){
     $('#reminderDismiss').addEventListener('click', hideReminderBanner);
     $('#bikeRouteBtn').addEventListener('click', showBikeRoute);
+
+    $('#shareEtaBtn').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (!shareEtaText) return;
+      if (navigator.share){
+        try { await navigator.share({ text: shareEtaText }); } catch (err) { /* user cancelled — ignore */ }
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(shareEtaText);
+        const original = btn.textContent;
+        btn.textContent = '✅ Copiat!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 2000);
+      } catch (err) {
+        alert(shareEtaText);
+      }
+    });
 
     $('#clockPrevBtn').addEventListener('click', () => {
       if (clockActiveIndex > 0){
