@@ -17,6 +17,7 @@
   :root{
     --ink:#14213D;
     --ink-soft:#33415C;
+    --text:#14213D;
     --paper:#EFECE3;
     --card:#FFFFFF;
     --red:#D62828;
@@ -30,14 +31,31 @@
     --route-orange:#FF9F43;
     --line:#DDD8C9;
     --muted:#726C5E;
+    --dirswitch-bg:#E4E0D2;
     --shadow: 0 1px 2px rgba(20,33,61,0.06), 0 8px 24px -12px rgba(20,33,61,0.25);
     --radius: 16px;
   }
+  /* automatic dark mode — toggled on <body> by JS based on the hour of day, not a manual switch */
+  body.dark-mode{
+    --ink-soft:#C7CCD9;
+    --text:#E7E9EF;
+    --paper:#17181B;
+    --card:#232428;
+    --line:#3A3B40;
+    --muted:#9C978A;
+    --dirswitch-bg:#2C2D31;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  body.dark-mode .notice-pill.rain{color:#8FC1FF;}
+  body.dark-mode .notice-pill.weekend{color:#F0C878;}
+  body.dark-mode .notice-pill.pollen-mod{color:#F0C878;}
+  body.dark-mode .notice-pill.pollen-high{color:#FF9B9B;}
+  body.dark-mode .alt-stop-picker select{background:var(--card); color:var(--text);}
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
     background:var(--paper);
-    color:var(--ink);
+    color:var(--text);
     font-family:'Work Sans', system-ui, sans-serif;
     -webkit-font-smoothing:antialiased;
     min-height:100vh;
@@ -160,7 +178,7 @@
 
   .dirswitch{
     display:flex;
-    background:#E4E0D2;
+    background:var(--dirswitch-bg);
     border-radius:12px;
     padding:4px;
     gap:4px;
@@ -235,6 +253,17 @@
     color:#FFD8D8;
     line-height:1.4;
   }
+  .last-bus-note{
+    display:none;
+    margin-top:8px;
+    padding:7px 11px;
+    border-radius:10px;
+    background:rgba(214,40,40,0.35);
+    color:#FFD8D8;
+    font-size:13.5px;
+    font-weight:700;
+    line-height:1.4;
+  }
   .analog-clock-row{
     display:flex;
     align-items:center;
@@ -291,7 +320,7 @@
     font-family:'Oswald',sans-serif;
     font-weight:700;
     font-size:15px;
-    fill:var(--ink);
+    fill:var(--text);
     text-anchor:middle;
     dominant-baseline:central;
   }
@@ -492,8 +521,8 @@
     padding:8px;
     font-family:'Work Sans',sans-serif;
     font-size:16.5px;
-    color:var(--ink);
-    background:#fff;
+    color:var(--text);
+    background:var(--card);
   }
   .approx-note{
     font-size:13px;
@@ -524,7 +553,7 @@
     font-family:'IBM Plex Mono',monospace;
     font-weight:600;
     font-size:19px;
-    color:var(--ink);
+    color:var(--text);
     padding:6px 0;
   }
   .chips{
@@ -634,7 +663,7 @@
     font-weight:600;
     font-size:16.5px;
     letter-spacing:0.3px;
-    color:var(--ink);
+    color:var(--text);
     cursor:pointer;
   }
   .map-toggle .chev{
@@ -900,6 +929,7 @@
   <div class="hero">
     <div class="eyebrow"><span class="dot"></span> <span id="heroTitle">Următorul autobuz</span><span class="pin-hint" id="pinHint"></span></div>
     <div class="skip-note" id="skipNote"></div>
+    <div class="last-bus-note" id="lastBusNote"></div>
     <div class="flipwrap">
       <div class="flip-time mono" id="nextTime">--:--</div>
       <div class="eta" id="nextEta">—</div>
@@ -1146,6 +1176,19 @@
     return out;
   }
 
+  // returns 0 if `active` is the very last departure of the day, 1 if second-to-last,
+  // or null otherwise — used to flag "last bus" warnings
+  function lastBusRank(active, dayType){
+    if (!active) return null;
+    const all = mergedDepartures(dayType);
+    if (!all.length) return null;
+    for (let i = 0; i < 2 && i < all.length; i++){
+      const d = all[all.length - 1 - i];
+      if (d.mfm === active.mfm && d.line === active.line) return i;
+    }
+    return null;
+  }
+
   // finds the scheduled arrival time at the other end for a specific departure, by matching
   // its rank (1st, 2nd, 3rd... departure of the day for that line) to the same rank in the
   // other stop's own schedule — sound here since we've verified this schedule matches the
@@ -1268,7 +1311,7 @@
     $('#reminderBanner').classList.remove('show');
   }
 
-  function checkReminder(active, nowMfm){
+  function checkReminder(active, nowMfm, rank){
     const today = new Date().toDateString();
     if (reminderFiredDate !== today){ reminderFiredDate = today; reminderFiredFor = null; }
     if (!active) return;
@@ -1280,7 +1323,12 @@
     if (diffToLeave <= 0 && reminderFiredFor !== key){
       reminderFiredFor = key;
       playAlertSound();
-      showReminderBanner('🔔 E timpul să pleci! Linia ' + active.line + ' vine la ' + active.label + '.');
+      const msg = rank === 0
+        ? '🚨 ULTIMUL AUTOBUZ de azi! Linia ' + active.line + ' vine la ' + active.label + ' — pleacă acum!'
+        : rank === 1
+        ? '🚨 Penultimul autobuz de azi! Linia ' + active.line + ' vine la ' + active.label + ' — mai ai unul după.'
+        : '🔔 E timpul să pleci! Linia ' + active.line + ' vine la ' + active.label + '.';
+      showReminderBanner(msg);
     }
   }
 
@@ -1391,10 +1439,22 @@
 
     const skipNoteEl = $('#skipNote');
     if (!pinnedDeparture && tooSoon && autoNext && autoNext.mfm !== tooSoon.mfm){
-      skipNoteEl.style.display = '';
+      skipNoteEl.style.display = 'block';
       skipNoteEl.textContent = 'Autobuzul de la ' + tooSoon.label + ' e prea aproape ca să-l prinzi — următorul posibil: ' + autoNext.label + '.';
     } else {
       skipNoteEl.style.display = 'none';
+    }
+
+    const lastBusNoteEl = $('#lastBusNote');
+    const rank = lastBusRank(active, dayType);
+    if (rank === 0){
+      lastBusNoteEl.style.display = 'block';
+      lastBusNoteEl.textContent = '⚠️ Acesta e ultimul autobuz de azi pe acest sens!';
+    } else if (rank === 1){
+      lastBusNoteEl.style.display = 'block';
+      lastBusNoteEl.textContent = '⚠️ Mai e doar un autobuz după acesta azi.';
+    } else {
+      lastBusNoteEl.style.display = 'none';
     }
 
     $('#heroTitle').textContent = pinnedDeparture ? 'Autobuz selectat' : 'Următorul autobuz';
@@ -1489,7 +1549,7 @@
     populateDepSelect(deps, active);
     updateMapSelection();
     updateBusPositionMarker(active, nowMfm);
-    checkReminder(active, nowMfm);
+    checkReminder(active, nowMfm, rank);
     updateClockHands(active);
     updateClockSidePills(deps, active);
     updateHeaderStatus(active, nowMfm);
@@ -1540,6 +1600,16 @@
     const now = new Date();
     $('#clockNow').textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
     $('#clockDate').textContent = DAY_NAMES_SHORT[now.getDay()] + ', ' + now.getDate() + ' ' + MONTH_NAMES[now.getMonth()];
+    applyAutoDarkMode();
+  }
+
+  // automatic dark mode — dark from 20:00 to 06:59, light the rest of the day; no manual toggle
+  const DARK_MODE_START_HOUR = 20;
+  const DARK_MODE_END_HOUR = 7;
+  function applyAutoDarkMode(){
+    const h = new Date().getHours();
+    const isDark = h >= DARK_MODE_START_HOUR || h < DARK_MODE_END_HOUR;
+    document.body.classList.toggle('dark-mode', isDark);
   }
 
   // ---------- analog clock ----------
