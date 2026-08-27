@@ -1517,8 +1517,9 @@
           updateCalendarLink(active, leaveMfm, walkMin, home);
 
           $('#shareEtaBtn').style.display = 'inline-flex';
-          shareEtaText = 'Prind autobuzul ' + active.line + ' de la ' + stopLabel() + ' (vine la ' + active.label + ')'
-            + (arrival ? ', ajung la ' + otherEndLabel() + ' pe la ' + arrival.label + '.' : '.');
+          shareEtaText = 'Prind autobuzul 🚌 ' + active.line + ' de la ' + stopLabel() + ' (vine la ' + active.label + ')'
+            + (arrival ? ', ajung la ' + otherEndLabel() + ' pe la ' + arrival.label + '.' : '.')
+            + ' 😊';
         }
       } else {
         nextTimeEl.textContent = '—:—';
