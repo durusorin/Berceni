@@ -95,44 +95,37 @@
     top:0;
     z-index:50;
   }
-  header.topbar .info-bar{
-    margin-top:0;
-    flex:1 1 auto;
-    min-width:0;
+  .badge{
+    background:var(--red);
+    color:#fff;
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:18px;
+    letter-spacing:0.5px;
+    padding:4px 10px 5px;
+    border-radius:8px;
+    line-height:1;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.15) inset;
+    flex-shrink:0;
+  }
+  .topbar-title{
     display:flex;
     flex-direction:column;
-    row-gap:4px;
+    gap:2px;
+    min-width:0;
   }
-  header.topbar .info-row{
-    display:flex;
-    align-items:center;
-    flex-wrap:wrap;
-    row-gap:3px;
-  }
-  header.topbar .notice-pill{
-    background:none;
-    box-shadow:none;
-    border-radius:0;
-    font-size:28px;
+  .topbar-title .r1{
+    font-family:'Oswald',sans-serif;
     font-weight:600;
-    padding:0;
-    margin:0 12px 0 0;
-    color:#C9CEDA;
-    flex-shrink:0;
+    font-size:19px;
+    letter-spacing:0.3px;
     white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
-  header.topbar .notice-pill.rain{ background:none; color:#8FC1FF; }
-  header.topbar .notice-pill.weekend{ background:none; color:var(--amber); }
-  header.topbar .metro-map-link{
-    background:none;
-    width:auto;
-    height:auto;
-    font-size:28px;
-    font-weight:700;
+  .topbar-title .r2{
+    font-size:14.5px;
     color:#C9CEDA;
-    text-decoration:underline;
-    text-underline-offset:2px;
-    flex-shrink:0;
   }
   .topbar-clock{
     margin-left:auto;
@@ -857,11 +850,10 @@
 </div>
 
 <header class="topbar">
-  <div class="info-bar" id="infoBar">
-    <div class="info-row" id="infoRow1">
-      <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
-    </div>
-    <div class="info-row" id="infoRow2"></div>
+  <div class="badge">🚌</div>
+  <div class="topbar-title">
+    <div class="r1">Piața Sudului ⇄ Berceni City</div>
+    <div class="r2">Liniile 438 &amp; 475</div>
   </div>
   <div class="topbar-clock" id="topbarClock">
     <div class="time" id="clockNow">--:--</div>
@@ -938,6 +930,10 @@
       <button class="bike-route-link" id="bikeRouteBtn">🚲 Traseu cu bicicleta: Cricovul Sărat ⇄ Mihai Bravu</button>
       <span id="bikeRouteInfo"></span>
     </div>
+  </div>
+
+  <div class="info-bar" id="infoBar">
+    <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
   </div>
 
   <div class="analog-clock-row">
@@ -2058,7 +2054,7 @@
     } else {
       return;
     }
-    $('#infoRow2').appendChild(pill);
+    $('#infoBar').appendChild(pill);
   }
 
   const WEATHER_CODE_RAIN = new Set([51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99]);
@@ -2111,7 +2107,7 @@
       const tempPill = document.createElement('span');
       tempPill.className = 'notice-pill';
       tempPill.textContent = '🌡️ ' + temp + '°C';
-      $('#infoRow1').appendChild(tempPill);
+      $('#infoBar').appendChild(tempPill);
 
       const info = WEATHER_CODE_INFO[cur.weather_code];
       if (info){
@@ -2119,7 +2115,7 @@
         condPill.className = 'notice-pill';
         condPill.title = info.label;
         condPill.textContent = info.icon;
-        $('#infoRow1').appendChild(condPill);
+        $('#infoBar').appendChild(condPill);
       }
 
       if (cur.wind_speed_10m != null){
@@ -2138,7 +2134,7 @@
         if (cur.wind_gusts_10m != null){
           windPill.appendChild(document.createTextNode(' · 🌬️' + Math.round(cur.wind_gusts_10m) + ' km/h'));
         }
-        $('#infoRow2').appendChild(windPill);
+        $('#infoBar').appendChild(windPill);
       }
 
       let rainProb = null;
@@ -2151,7 +2147,7 @@
         const rainPill = document.createElement('span');
         rainPill.className = 'notice-pill rain';
         rainPill.textContent = (isRainNow ? '☔' : '🌂') + (rainProb != null ? ' ' + rainProb + '%' : '');
-        $('#infoRow2').appendChild(rainPill);
+        $('#infoBar').appendChild(rainPill);
       }
     } catch (e){
       // weather is a nice-to-have; fail silently if offline or API unreachable
