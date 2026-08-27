@@ -1796,7 +1796,10 @@
 
     // then try to replace it with a real, road-snapped walking route (OSRM public router)
     try {
-      const url = `https://router.project-osrm.org/route/v1/foot/${lastMeLatLng[1]},${lastMeLatLng[0]};${target.lon},${target.lat}?overview=full&geometries=geojson`;
+      // the generic OSRM demo server ignores the "foot" profile and just returns car routes
+      // (loops around roundabouts, etc.) — this community instance actually runs a
+      // pedestrian-specific routing graph
+      const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lastMeLatLng[1]},${lastMeLatLng[0]};${target.lon},${target.lat}?overview=full&geometries=geojson`;
       const resp = await fetch(url);
       if (!resp.ok) return;
       const data = await resp.json();
