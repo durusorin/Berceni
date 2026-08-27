@@ -95,29 +95,20 @@
     top:0;
     z-index:50;
   }
-  .badge{
-    background:var(--red);
-    color:#fff;
-    font-family:'Oswald',sans-serif;
-    font-weight:700;
-    font-size:18px;
-    letter-spacing:0.5px;
-    padding:4px 10px 5px;
-    border-radius:8px;
-    line-height:1;
-    box-shadow: 0 2px 0 rgba(0,0,0,0.15) inset;
-    flex-shrink:0;
-  }
   header.topbar .info-bar{
     margin-top:0;
     flex:1 1 auto;
     min-width:0;
-    flex-wrap:nowrap;
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
+    display:flex;
+    flex-direction:column;
+    row-gap:4px;
   }
-  header.topbar .info-bar::-webkit-scrollbar{ display:none; }
+  header.topbar .info-row{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    row-gap:3px;
+  }
   header.topbar .notice-pill{
     background:none;
     box-shadow:none;
@@ -866,9 +857,11 @@
 </div>
 
 <header class="topbar">
-  <div class="badge">🚌</div>
   <div class="info-bar" id="infoBar">
-    <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
+    <div class="info-row" id="infoRow1">
+      <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
+    </div>
+    <div class="info-row" id="infoRow2"></div>
   </div>
   <div class="topbar-clock" id="topbarClock">
     <div class="time" id="clockNow">--:--</div>
@@ -2065,7 +2058,7 @@
     } else {
       return;
     }
-    $('#infoBar').appendChild(pill);
+    $('#infoRow2').appendChild(pill);
   }
 
   const WEATHER_CODE_RAIN = new Set([51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99]);
@@ -2118,7 +2111,7 @@
       const tempPill = document.createElement('span');
       tempPill.className = 'notice-pill';
       tempPill.textContent = '🌡️ ' + temp + '°C';
-      $('#infoBar').appendChild(tempPill);
+      $('#infoRow1').appendChild(tempPill);
 
       const info = WEATHER_CODE_INFO[cur.weather_code];
       if (info){
@@ -2126,7 +2119,7 @@
         condPill.className = 'notice-pill';
         condPill.title = info.label;
         condPill.textContent = info.icon;
-        $('#infoBar').appendChild(condPill);
+        $('#infoRow1').appendChild(condPill);
       }
 
       if (cur.wind_speed_10m != null){
@@ -2145,7 +2138,7 @@
         if (cur.wind_gusts_10m != null){
           windPill.appendChild(document.createTextNode(' · 🌬️' + Math.round(cur.wind_gusts_10m) + ' km/h'));
         }
-        $('#infoBar').appendChild(windPill);
+        $('#infoRow2').appendChild(windPill);
       }
 
       let rainProb = null;
@@ -2158,7 +2151,7 @@
         const rainPill = document.createElement('span');
         rainPill.className = 'notice-pill rain';
         rainPill.textContent = (isRainNow ? '☔' : '🌂') + (rainProb != null ? ' ' + rainProb + '%' : '');
-        $('#infoBar').appendChild(rainPill);
+        $('#infoRow2').appendChild(rainPill);
       }
     } catch (e){
       // weather is a nice-to-have; fail silently if offline or API unreachable
