@@ -805,6 +805,24 @@
     opacity:0.7;
     text-align:center;
   }
+  .ticket-info{
+    margin-top:22px;
+    padding:14px 16px;
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .ticket-info-title{
+    font-weight:700;
+    font-size:15px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .ticket-info-body{
+    font-size:13.5px;
+    line-height:1.5;
+    color:var(--muted);
+  }
   .notice-pill{
     display:inline-flex;
     align-items:center;
@@ -820,7 +838,9 @@
   }
   .notice-pill.rain{background:#DCEAFB; color:#1A5FA8;}
   .notice-pill.weekend{background:#F3E6C8; color:#8A5A1B;}
-  .metro-map-link{
+  .notice-pill.pollen-mod{background:#F3E6C8; color:#8A5A1B;}
+  .notice-pill.pollen-high{background:#FBD5D5; color:#A81E1E;}
+  .metro-map-link, .stb-alerts-link{
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -834,6 +854,10 @@
     text-decoration:none;
     box-shadow:var(--shadow);
     margin:4px 6px 4px 0;
+  }
+  .stb-alerts-link{
+    background:var(--route-orange);
+    font-size:17px;
   }
 
   .leaflet-popup-content{font-family:'Work Sans',sans-serif; font-size:16px;}
@@ -935,6 +959,7 @@
 
   <div class="info-bar" id="infoBar">
     <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
+    <a class="stb-alerts-link" href="https://www.stb.ro/info" target="_blank" rel="noopener" title="Anunțuri STB — devieri și modificări de traseu">📢</a>
   </div>
 
   <div class="analog-clock-row">
@@ -954,6 +979,15 @@
     <button class="clock-side-pill" id="clockNextBtn" disabled>— ›</button>
   </div>
   <div class="clock-caption">acele groase, colorate = autobuzul · acele subțiri, roșii = ora curentă · săgețile aleg altă cursă</div>
+
+  <div class="ticket-info">
+    <div class="ticket-info-title">🎫 Cum plătești biletul</div>
+    <div class="ticket-info-body">
+      Card contactless (Visa/Mastercard/Maestro) direct la validatorul din autobuz — fără comision.<br>
+      Sau SMS la <strong>7458</strong>, trimis <em>înainte</em> să urci, păstrează codul de confirmare.<br>
+      Sau aplicațiile 24Pay, LETZ PAY ori Bilet TB.
+    </div>
+  </div>
 
   <div class="credit">Creat de Sorin Duru</div>
 
@@ -2179,6 +2213,57 @@
     }
   }
 
+  // European AQI bands (Copernicus/EEA scale, 0-100+)
+  function eaqiInfo(aqi){
+    if (aqi == null) return null;
+    if (aqi <= 20) return { label: 'Bun', cls: '' };
+    if (aqi <= 40) return { label: 'Acceptabil', cls: '' };
+    if (aqi <= 60) return { label: 'Moderat', cls: 'pollen-mod' };
+    if (aqi <= 80) return { label: 'Nesănătos', cls: 'pollen-high' };
+    return { label: 'Foarte nesănătos', cls: 'pollen-high' };
+  }
+
+  // ragweed (ambrozie) pollen bands, grains/m³ — common European aerobiology thresholds
+  function ragweedInfo(value){
+    if (value == null || value <= 0) return null;
+    if (value <= 10) return { label: 'Scăzut', cls: '' };
+    if (value <= 30) return { label: 'Moderat', cls: 'pollen-mod' };
+    if (value <= 50) return { label: 'Ridicat', cls: 'pollen-high' };
+    return { label: 'Foarte ridicat', cls: 'pollen-high' };
+  }
+
+  async function loadAirQuality(){
+    try {
+      const lat = SEGMENT_DATA.lines[0].piataSudului.lat;
+      const lon = SEGMENT_DATA.lines[0].piataSudului.lon;
+      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi,ragweed_pollen&timezone=Europe%2FBucharest`;
+      const resp = await fetch(url);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const cur = data.current;
+      if (!cur) return;
+
+      // ambrozie (ragweed) first — flagged as priority for allergy sufferers
+      const pInfo = ragweedInfo(cur.ragweed_pollen);
+      if (pInfo){
+        const pill = document.createElement('span');
+        pill.className = 'notice-pill ' + pInfo.cls;
+        pill.textContent = '🌾 Ambrozie: ' + pInfo.label + ' (' + Math.round(cur.ragweed_pollen) + ')';
+        $('#infoBar').appendChild(pill);
+      }
+
+      const aInfo = eaqiInfo(cur.european_aqi);
+      if (aInfo){
+        const pill = document.createElement('span');
+        pill.className = 'notice-pill ' + aInfo.cls;
+        pill.textContent = '🏭 Aer: ' + aInfo.label + ' (AQI ' + Math.round(cur.european_aqi) + ')';
+        $('#infoBar').appendChild(pill);
+      }
+    } catch (e){
+      // nice-to-have; fail silently if offline or API unreachable
+    }
+  }
+
   try {
     populateAltStopSelect();
     updateDestLabels();
@@ -2191,6 +2276,7 @@
     setInterval(updateCurrentClockHands, 1000);
     renderWeekendNotice();
     loadWeather();
+    loadAirQuality();
   } catch (err) {
     $('#depList').innerHTML = '<div class="empty-note">Eroare la încărcarea orarului.</div>';
     console.error(err);
