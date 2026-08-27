@@ -823,6 +823,7 @@
         <g id="clockTicks"></g>
         <g id="clockNumbers"></g>
         <g id="clockBusMarkers"></g>
+        <g id="clockBusHand"></g>
         <line id="clockHourHand" class="clock-hand hour" x1="100" y1="100" x2="100" y2="60"/>
         <line id="clockMinHand" class="clock-hand minute" x1="100" y1="100" x2="100" y2="40"/>
         <circle class="clock-center" cx="100" cy="100" r="5"/>
@@ -1459,22 +1460,58 @@
     const g = document.getElementById('clockBusMarkers');
     if (!g) return;
     g.innerHTML = '';
+    // dimmed dots for the other upcoming buses — the active one gets the bold hand instead
     deps.slice(0, 6).forEach(d => {
+      const isActive = active && d.mfm === active.mfm && d.line === active.line;
+      if (isActive) return;
       const hour = Math.floor(d.mfm / 60) % 12;
       const min = d.mfm % 60;
       const [x, y] = clockPolar(90, hour * 30 + min * 0.5);
-      const isActive = active && d.mfm === active.mfm && d.line === active.line;
       const dot = document.createElementNS(SVG_NS, 'circle');
       dot.setAttribute('cx', x); dot.setAttribute('cy', y);
-      dot.setAttribute('r', isActive ? 7 : 4);
-      dot.setAttribute('fill', isActive ? getVar(d.line === '475' ? '--red' : '--teal') : getVar('--muted'));
-      dot.setAttribute('opacity', isActive ? '1' : '0.35');
-      if (isActive){
-        dot.setAttribute('stroke', '#fff');
-        dot.setAttribute('stroke-width', '2');
-      }
+      dot.setAttribute('r', 4);
+      dot.setAttribute('fill', getVar('--muted'));
+      dot.setAttribute('opacity', '0.35');
       g.appendChild(dot);
     });
+    updateBusHand(active);
+  }
+
+  function updateBusHand(active){
+    const g = document.getElementById('clockBusHand');
+    if (!g) return;
+    g.innerHTML = '';
+    if (!active) return;
+
+    const hour = Math.floor(active.mfm / 60) % 12;
+    const min = active.mfm % 60;
+    const angle = hour * 30 + min * 0.5;
+    const color = getVar(active.line === '475' ? '--red' : '--teal');
+
+    const [x1, y1] = clockPolar(16, angle);
+    const [x2, y2] = clockPolar(80, angle);
+    const hand = document.createElementNS(SVG_NS, 'line');
+    hand.setAttribute('x1', x1); hand.setAttribute('y1', y1);
+    hand.setAttribute('x2', x2); hand.setAttribute('y2', y2);
+    hand.setAttribute('stroke', color);
+    hand.setAttribute('stroke-width', '7');
+    hand.setAttribute('stroke-linecap', 'round');
+    g.appendChild(hand);
+
+    // arrowhead at the tip, pointing at the exact bus time
+    const rad = (angle - 90) * Math.PI / 180;
+    const perp = rad + Math.PI / 2;
+    const [tx, ty] = clockPolar(90, angle);
+    const [bx, by] = clockPolar(77, angle);
+    const spread = 7;
+    const p1 = [bx + spread * Math.cos(perp), by + spread * Math.sin(perp)];
+    const p2 = [bx - spread * Math.cos(perp), by - spread * Math.sin(perp)];
+    const tri = document.createElementNS(SVG_NS, 'polygon');
+    tri.setAttribute('points', `${tx},${ty} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}`);
+    tri.setAttribute('fill', color);
+    tri.setAttribute('stroke', '#fff');
+    tri.setAttribute('stroke-width', '1.5');
+    g.appendChild(tri);
   }
 
   function dedupeStops(lists){
