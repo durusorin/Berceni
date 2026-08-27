@@ -108,24 +108,28 @@
     box-shadow: 0 2px 0 rgba(0,0,0,0.15) inset;
     flex-shrink:0;
   }
-  .topbar-title{
-    display:flex;
-    flex-direction:column;
-    gap:2px;
+  header.topbar .info-bar{
+    margin-top:0;
+    flex:1 1 auto;
     min-width:0;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
   }
-  .topbar-title .r1{
-    font-family:'Oswald',sans-serif;
-    font-weight:600;
-    font-size:19px;
-    letter-spacing:0.3px;
+  header.topbar .info-bar::-webkit-scrollbar{ display:none; }
+  header.topbar .notice-pill{
+    font-size:12.5px;
+    padding:5px 9px;
+    margin:0 6px 0 0;
+    flex-shrink:0;
     white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
   }
-  .topbar-title .r2{
-    font-size:14.5px;
-    color:#C9CEDA;
+  header.topbar .metro-map-link{
+    width:28px;
+    height:28px;
+    font-size:13px;
+    flex-shrink:0;
   }
   .topbar-clock{
     margin-left:auto;
@@ -851,9 +855,8 @@
 
 <header class="topbar">
   <div class="badge">🚌</div>
-  <div class="topbar-title">
-    <div class="r1" id="headerTitle">Piața Sudului ⇄ Berceni City</div>
-    <div class="r2">Liniile 438 &amp; 475</div>
+  <div class="info-bar" id="infoBar">
+    <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
   </div>
   <div class="topbar-clock" id="topbarClock">
     <div class="time" id="clockNow">--:--</div>
@@ -930,10 +933,6 @@
       <button class="bike-route-link" id="bikeRouteBtn">🚲 Traseu cu bicicleta: Cricovul Sărat ⇄ Mihai Bravu</button>
       <span id="bikeRouteInfo"></span>
     </div>
-  </div>
-
-  <div class="info-bar" id="infoBar">
-    <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
   </div>
 
   <div class="analog-clock-row">
@@ -1312,8 +1311,8 @@
   }
 
   function updateDestLabels(){
-    // headerTitle is fixed app branding ("Berceni City"); only the direction button
-    // reflects the actually-selected stop, since that's what matters functionally
+    // only the direction button reflects the actually-selected stop, since that's
+    // what matters functionally
     const d = destOption();
     const btn = document.querySelector('#dirSwitch button[data-dir="outbound"]');
     if (btn) btn.textContent = 'Spre ' + d.displayName;
