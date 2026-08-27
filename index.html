@@ -235,6 +235,12 @@
     justify-content:center;
     margin-top:10px;
   }
+  .clock-caption{
+    text-align:center;
+    font-size:11px;
+    color:#8890A6;
+    margin-top:4px;
+  }
   #analogClock{
     width:190px;
     height:190px;
@@ -261,8 +267,15 @@
     stroke:var(--ink);
     stroke-linecap:round;
   }
-  .clock-hand.hour{stroke-width:7; transition:stroke .2s ease;}
-  .clock-hand.minute{stroke-width:5.5; transition:stroke .2s ease;}
+  .clock-hand.hour{stroke-width:9; transition:stroke .2s ease;}
+  .clock-hand.minute{stroke-width:7; transition:stroke .2s ease;}
+  .clock-hand-cur{
+    stroke:var(--amber);
+    stroke-linecap:round;
+    opacity:0.85;
+  }
+  .clock-hand-cur.hour{stroke-width:2.5;}
+  .clock-hand-cur.minute{stroke-width:2;}
   .clock-center{fill:var(--red);}
   .flipwrap{
     display:flex;
@@ -822,11 +835,14 @@
         <circle class="clock-face" cx="100" cy="100" r="92"/>
         <g id="clockTicks"></g>
         <g id="clockNumbers"></g>
+        <line id="clockCurHourHand" class="clock-hand-cur hour" x1="100" y1="100" x2="100" y2="60"/>
+        <line id="clockCurMinHand" class="clock-hand-cur minute" x1="100" y1="100" x2="100" y2="40"/>
         <line id="clockHourHand" class="clock-hand hour" x1="100" y1="100" x2="100" y2="60"/>
         <line id="clockMinHand" class="clock-hand minute" x1="100" y1="100" x2="100" y2="40"/>
         <circle class="clock-center" cx="100" cy="100" r="5"/>
       </svg>
     </div>
+    <div class="clock-caption">acele groase, colorate = autobuzul · acele subțiri, aurii = ora curentă</div>
     <div class="flipwrap">
       <div class="flip-time mono" id="nextTime">--:--</div>
       <div class="eta" id="nextEta">—</div>
@@ -1448,7 +1464,7 @@
     const hourHand = document.getElementById('clockHourHand');
     const minHand = document.getElementById('clockMinHand');
     if (!hourHand || !minHand) return;
-    const color = active ? getVar(active.line === '475' ? '--red' : '--teal') : getVar('--ink-soft');
+    const color = active ? getVar(active.line === '475' ? '--red' : '--green') : getVar('--ink-soft');
     hourHand.setAttribute('stroke', color);
     minHand.setAttribute('stroke', color);
     if (!active){
@@ -1462,6 +1478,19 @@
     const min = active.mfm % 60;
     const [hx, hy] = clockPolar(50, hour * 30 + min * 0.5);
     const [mx, my] = clockPolar(72, min * 6);
+    hourHand.setAttribute('x2', hx); hourHand.setAttribute('y2', hy);
+    minHand.setAttribute('x2', mx); minHand.setAttribute('y2', my);
+  }
+
+  // faint reference hands showing the actual current wall-clock time
+  function updateCurrentClockHands(){
+    const hourHand = document.getElementById('clockCurHourHand');
+    const minHand = document.getElementById('clockCurMinHand');
+    if (!hourHand || !minHand) return;
+    const now = new Date();
+    const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
+    const [hx, hy] = clockPolar(45, h * 30 + m * 0.5);
+    const [mx, my] = clockPolar(66, m * 6 + s * 0.1);
     hourHand.setAttribute('x2', hx); hourHand.setAttribute('y2', hy);
     minHand.setAttribute('x2', mx); minHand.setAttribute('y2', my);
   }
@@ -1870,9 +1899,11 @@
     updateDestLabels();
     wireEvents();
     buildClockFace();
+    updateCurrentClockHands();
     render();
     tickClock();
     tickTimer = setInterval(() => { tickClock(); render(); }, 15000);
+    setInterval(updateCurrentClockHands, 1000);
     renderWeekendNotice();
     loadWeather();
   } catch (err) {
