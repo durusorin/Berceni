@@ -232,15 +232,38 @@
     color:#FFD8D8;
     line-height:1.4;
   }
+  .analog-clock-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    margin-top:22px;
+  }
   .analog-clock-wrap{
     display:flex;
     justify-content:center;
-    margin-top:22px;
     background:var(--ink);
     border-radius:var(--radius);
     box-shadow:var(--shadow);
     padding:16px;
   }
+  .clock-side-pill{
+    flex-shrink:0;
+    border:none;
+    background:var(--card);
+    box-shadow:var(--shadow);
+    border-radius:999px;
+    padding:10px 12px;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:14px;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .clock-side-pill:disabled{opacity:0.35; cursor:default;}
+  .clock-side-pill:active:not(:disabled){transform:scale(0.96);}
+  .clock-side-pill.l475{background:var(--red); color:#fff;}
+  .clock-side-pill.l438{background:var(--green); color:#fff;}
   .clock-caption{
     text-align:center;
     font-size:11px;
@@ -914,19 +937,23 @@
     <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
   </div>
 
-  <div class="analog-clock-wrap">
-    <svg id="analogClock" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-      <circle class="clock-face" cx="100" cy="100" r="92"/>
-      <g id="clockTicks"></g>
-      <g id="clockNumbers"></g>
-      <polygon id="clockCurHourHand" class="clock-hand-cur hour"/>
-      <polygon id="clockCurMinHand" class="clock-hand-cur minute"/>
-      <polygon id="clockHourHand" class="clock-hand hour"/>
-      <polygon id="clockMinHand" class="clock-hand minute"/>
-      <circle class="clock-center" cx="100" cy="100" r="5"/>
-    </svg>
+  <div class="analog-clock-row">
+    <button class="clock-side-pill" id="clockPrevBtn" disabled>‹ —</button>
+    <div class="analog-clock-wrap">
+      <svg id="analogClock" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <circle class="clock-face" cx="100" cy="100" r="92"/>
+        <g id="clockTicks"></g>
+        <g id="clockNumbers"></g>
+        <polygon id="clockCurHourHand" class="clock-hand-cur hour"/>
+        <polygon id="clockCurMinHand" class="clock-hand-cur minute"/>
+        <polygon id="clockHourHand" class="clock-hand hour"/>
+        <polygon id="clockMinHand" class="clock-hand minute"/>
+        <circle class="clock-center" cx="100" cy="100" r="5"/>
+      </svg>
+    </div>
+    <button class="clock-side-pill" id="clockNextBtn" disabled>— ›</button>
   </div>
-  <div class="clock-caption">acele groase, colorate = autobuzul · acele subțiri, aurii = ora curentă</div>
+  <div class="clock-caption">acele groase, colorate = autobuzul · acele subțiri, aurii = ora curentă · săgețile aleg altă cursă</div>
 
   <div class="credit">Creat de Sorin Duru</div>
 
@@ -1431,6 +1458,7 @@
     updateBusPositionMarker(active, nowMfm);
     checkReminder(active, nowMfm);
     updateClockHands(active);
+    updateClockSidePills(deps, active);
   }
 
   function depKey(d){ return d.mfm + '_' + d.line; }
@@ -1528,8 +1556,41 @@
     minHand.setAttribute('opacity', '1');
     const hour = Math.floor(active.mfm / 60) % 12;
     const min = active.mfm % 60;
-    hourHand.setAttribute('points', handPolygonPoints(hour * 30 + min * 0.5, 52, 9, 9));
-    minHand.setAttribute('points', handPolygonPoints(min * 6, 75, 6.5, 10));
+    hourHand.setAttribute('points', handPolygonPoints(hour * 30 + min * 0.5, 52, 17, 12));
+    minHand.setAttribute('points', handPolygonPoints(min * 6, 75, 13, 14));
+  }
+
+  let clockDeps = [];
+  let clockActiveIndex = -1;
+
+  function updateClockSidePills(deps, active){
+    const prevBtn = document.getElementById('clockPrevBtn');
+    const nextBtn = document.getElementById('clockNextBtn');
+    if (!prevBtn || !nextBtn) return;
+    clockDeps = deps;
+    clockActiveIndex = active ? deps.findIndex(d => d.mfm === active.mfm && d.line === active.line) : -1;
+
+    const prev = clockActiveIndex > 0 ? deps[clockActiveIndex - 1] : null;
+    const next = clockActiveIndex >= 0 && clockActiveIndex < deps.length - 1 ? deps[clockActiveIndex + 1] : null;
+
+    if (prev){
+      prevBtn.disabled = false;
+      prevBtn.textContent = '‹ ' + prev.label;
+      prevBtn.className = 'clock-side-pill l' + prev.line;
+    } else {
+      prevBtn.disabled = true;
+      prevBtn.textContent = '‹ —';
+      prevBtn.className = 'clock-side-pill';
+    }
+    if (next){
+      nextBtn.disabled = false;
+      nextBtn.textContent = next.label + ' ›';
+      nextBtn.className = 'clock-side-pill l' + next.line;
+    } else {
+      nextBtn.disabled = true;
+      nextBtn.textContent = '— ›';
+      nextBtn.className = 'clock-side-pill';
+    }
   }
 
   // faint reference hands showing the actual current wall-clock time
@@ -1916,6 +1977,19 @@
   function wireEvents(){
     $('#reminderDismiss').addEventListener('click', hideReminderBanner);
     $('#bikeRouteBtn').addEventListener('click', showBikeRoute);
+
+    $('#clockPrevBtn').addEventListener('click', () => {
+      if (clockActiveIndex > 0){
+        pinnedDeparture = clockDeps[clockActiveIndex - 1];
+        render();
+      }
+    });
+    $('#clockNextBtn').addEventListener('click', () => {
+      if (clockActiveIndex >= 0 && clockActiveIndex < clockDeps.length - 1){
+        pinnedDeparture = clockDeps[clockActiveIndex + 1];
+        render();
+      }
+    });
 
     document.querySelectorAll('#dirSwitch button').forEach(btn => {
       btn.addEventListener('click', () => {
