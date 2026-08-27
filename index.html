@@ -300,11 +300,11 @@
     transition:fill .2s ease;
   }
   .clock-hand-cur{
-    fill:var(--amber);
+    fill:var(--red);
     stroke:#fff;
-    stroke-width:0.75;
+    stroke-width:1.5;
     stroke-linejoin:round;
-    opacity:0.9;
+    opacity:0.95;
   }
   .clock-center{fill:var(--red);}
   .flipwrap{
@@ -944,16 +944,16 @@
         <circle class="clock-face" cx="100" cy="100" r="92"/>
         <g id="clockTicks"></g>
         <g id="clockNumbers"></g>
-        <polygon id="clockCurHourHand" class="clock-hand-cur hour"/>
-        <polygon id="clockCurMinHand" class="clock-hand-cur minute"/>
         <polygon id="clockHourHand" class="clock-hand hour"/>
         <polygon id="clockMinHand" class="clock-hand minute"/>
+        <polygon id="clockCurHourHand" class="clock-hand-cur hour"/>
+        <polygon id="clockCurMinHand" class="clock-hand-cur minute"/>
         <circle class="clock-center" cx="100" cy="100" r="5"/>
       </svg>
     </div>
     <button class="clock-side-pill" id="clockNextBtn" disabled>— ›</button>
   </div>
-  <div class="clock-caption">acele groase, colorate = autobuzul · acele subțiri, aurii = ora curentă · săgețile aleg altă cursă</div>
+  <div class="clock-caption">acele groase, colorate = autobuzul · acele subțiri, roșii = ora curentă · săgețile aleg altă cursă</div>
 
   <div class="credit">Creat de Sorin Duru</div>
 
@@ -1600,8 +1600,8 @@
     if (!hourHand || !minHand) return;
     const now = new Date();
     const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
-    hourHand.setAttribute('points', handPolygonPoints(h * 30 + m * 0.5, 40, 4, 6));
-    minHand.setAttribute('points', handPolygonPoints(m * 6 + s * 0.1, 60, 3, 6));
+    hourHand.setAttribute('points', handPolygonPoints(h * 30 + m * 0.5, 40, 6, 6));
+    minHand.setAttribute('points', handPolygonPoints(m * 6 + s * 0.1, 60, 5, 6));
   }
 
   function dedupeStops(lists){
@@ -2087,11 +2087,14 @@
     99: { icon: '⛈️', label: 'Furtună cu grindină puternică' },
   };
 
+  // 8-point compass arrows, indexed by rounding the "blowing towards" bearing to the nearest 45°
+  const WIND_ARROWS = ['↑','↗','→','↘','↓','↙','←','↖'];
+
   async function loadWeather(){
     try {
       const lat = SEGMENT_DATA.lines[0].piataSudului.lat;
       const lon = SEGMENT_DATA.lines[0].piataSudului.lon;
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&timezone=Europe%2FBucharest`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m&hourly=precipitation_probability&timezone=Europe%2FBucharest`;
       const resp = await fetch(url);
       if (!resp.ok) return;
       const data = await resp.json();
@@ -2108,23 +2111,40 @@
       if (info){
         const condPill = document.createElement('span');
         condPill.className = 'notice-pill';
-        condPill.textContent = info.icon + ' ' + info.label;
+        condPill.title = info.label;
+        condPill.textContent = info.icon;
         $('#infoBar').appendChild(condPill);
       }
 
       if (cur.wind_speed_10m != null){
         const windPill = document.createElement('span');
         windPill.className = 'notice-pill';
-        const gust = cur.wind_gusts_10m != null ? ' (rafale ' + Math.round(cur.wind_gusts_10m) + ' km/h)' : '';
-        windPill.textContent = '💨 ' + Math.round(cur.wind_speed_10m) + ' km/h' + gust;
+        windPill.textContent = '💨 ' + Math.round(cur.wind_speed_10m) + ' km/h';
+        if (cur.wind_direction_10m != null){
+          // API gives the direction the wind blows FROM; rotate 180° to show where it blows TOWARDS
+          const toBearing = (cur.wind_direction_10m + 180) % 360;
+          const arrow = WIND_ARROWS[Math.round(toBearing / 45) % 8];
+          const arrowSpan = document.createElement('span');
+          arrowSpan.style.display = 'inline-block';
+          arrowSpan.textContent = ' ' + arrow;
+          windPill.appendChild(arrowSpan);
+        }
+        if (cur.wind_gusts_10m != null){
+          windPill.appendChild(document.createTextNode(' · 🌬️' + Math.round(cur.wind_gusts_10m) + ' km/h'));
+        }
         $('#infoBar').appendChild(windPill);
       }
 
-      const isRain = (cur.precipitation && cur.precipitation > 0) || WEATHER_CODE_RAIN.has(cur.weather_code);
-      if (isRain){
+      let rainProb = null;
+      if (cur.time && data.hourly && data.hourly.time && data.hourly.precipitation_probability){
+        const idx = data.hourly.time.findIndex(t => t.startsWith(cur.time.slice(0, 13)));
+        if (idx !== -1) rainProb = data.hourly.precipitation_probability[idx];
+      }
+      const isRainNow = (cur.precipitation && cur.precipitation > 0) || WEATHER_CODE_RAIN.has(cur.weather_code);
+      if (isRainNow || (rainProb != null && rainProb >= 20)){
         const rainPill = document.createElement('span');
         rainPill.className = 'notice-pill rain';
-        rainPill.textContent = '☔ Ia umbrela, plouă';
+        rainPill.textContent = (isRainNow ? '☔' : '🌂') + (rainProb != null ? ' ' + rainProb + '%' : '');
         $('#infoBar').appendChild(rainPill);
       }
     } catch (e){
