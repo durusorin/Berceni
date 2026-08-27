@@ -931,6 +931,7 @@
   let tickTimer = null;
   let reminderFiredFor = null, reminderFiredDate = null;
   let calendarBlobUrl = null;
+  let meLineRequestId = 0;
   let audioCtx = null;
 
   const $ = (sel) => document.querySelector(sel);
@@ -1769,18 +1770,45 @@
     ctrl.addTo(map);
   }
 
-  function updateMeLineForCurrentDir(){
+  function drawMeLine(latlngs, approx){
+    if (meLine) map.removeLayer(meLine);
+    meLine = L.polyline(latlngs, { color:'#1A73E8', weight: approx ? 3 : 4, dashArray: approx ? '2 8' : null }).addTo(map);
+  }
+
+  function updateLocateInfo(distM, minutes, targetName, approx){
+    const info = $('#locateInfo');
+    info.classList.remove('hidden');
+    const note = approx ? ' (linie dreaptă, aproximativ)' : ' (pe traseul real, pe jos)';
+    info.innerHTML = `Poziția ta: <b>~${Math.round(distM)} m</b>${note}, ~${formatMinutes(minutes)} până la <b>${targetName}</b>.`;
+  }
+
+  async function updateMeLineForCurrentDir(){
     if (!lastMeLatLng || !map) return;
     const target = originCoords();
     const targetName = stopLabel();
-    if (meLine) map.removeLayer(meLine);
-    meLine = L.polyline([lastMeLatLng, [target.lat, target.lon]], { color:'#1A73E8', weight:3, dashArray:'2 8' }).addTo(map);
+    const requestId = ++meLineRequestId;
 
-    const distM = haversine(lastMeLatLng[0], lastMeLatLng[1], target.lat, target.lon);
-    const minutes = Math.ceil(distM * DETOUR_FACTOR / 1000 / WALK_SPEED_KMH * 60);
-    const info = $('#locateInfo');
-    info.classList.remove('hidden');
-    info.innerHTML = `Poziția ta: <b>~${Math.round(distM)} m</b> (linie dreaptă, ~${formatMinutes(minutes)} pe jos) până la <b>${targetName}</b>.`;
+    // draw the straight-line estimate immediately, for instant feedback
+    drawMeLine([lastMeLatLng, [target.lat, target.lon]], true);
+    const straightM = haversine(lastMeLatLng[0], lastMeLatLng[1], target.lat, target.lon);
+    const straightMin = Math.ceil(straightM * DETOUR_FACTOR / 1000 / WALK_SPEED_KMH * 60);
+    updateLocateInfo(straightM, straightMin, targetName, true);
+
+    // then try to replace it with a real, road-snapped walking route (OSRM public router)
+    try {
+      const url = `https://router.project-osrm.org/route/v1/foot/${lastMeLatLng[1]},${lastMeLatLng[0]};${target.lon},${target.lat}?overview=full&geometries=geojson`;
+      const resp = await fetch(url);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (requestId !== meLineRequestId) return; // a newer request superseded this one
+      const route = data.routes && data.routes[0];
+      if (!route) return;
+      const coords = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+      drawMeLine(coords, false);
+      updateLocateInfo(route.distance, Math.ceil(route.duration / 60), targetName, false);
+    } catch (e){
+      // offline or router unreachable — the straight-line estimate above stays as-is
+    }
   }
 
   function addLocateControl(){
