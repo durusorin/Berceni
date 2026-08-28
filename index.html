@@ -753,13 +753,14 @@
     display:flex;
     gap:14px;
     padding:10px 14px 0;
-    font-size:14.5px;
+    font-size:16.5px;
+    font-weight:600;
     color:var(--muted);
     flex-wrap:wrap;
   }
-  .map-legend span{display:flex;align-items:center;gap:5px;}
-  .swatch{width:14px;height:4px;border-radius:2px;display:inline-block;}
-  .swatch.dot{width:8px;height:8px;border-radius:50%;}
+  .map-legend span{display:flex;align-items:center;gap:6px;}
+  .swatch{width:20px;height:6px;border-radius:3px;display:inline-block;}
+  .swatch.dot{width:14px;height:14px;border-radius:50%;}
   #locateInfo{
     padding:8px 14px 14px;
     font-size:14.5px;
@@ -831,23 +832,23 @@
   .tile-switch button:last-child{border-bottom:none;}
   .tile-switch button.active{background:var(--ink); color:#fff;}
   .stop-icon-endpoint{
-    width:22px;height:22px;
+    width:32px;height:32px;
+    border-radius:50%;
+    background:var(--stop-blue);
+    border:4px solid #fff;
+    box-shadow:0 1px 5px rgba(0,0,0,0.5);
+  }
+  .stop-icon-mid{
+    width:20px;height:20px;
     border-radius:50%;
     background:var(--stop-blue);
     border:3px solid #fff;
-    box-shadow:0 1px 4px rgba(0,0,0,0.45);
-  }
-  .stop-icon-mid{
-    width:13px;height:13px;
-    border-radius:50%;
-    background:var(--stop-blue);
-    border:2px solid #fff;
-    box-shadow:0 1px 3px rgba(0,0,0,0.35);
+    box-shadow:0 1px 4px rgba(0,0,0,0.4);
   }
   .stop-tooltip{
     font-family:'Work Sans',sans-serif;
-    font-weight:600;
-    font-size:14px;
+    font-weight:700;
+    font-size:18px;
     background:var(--ink);
     color:#fff;
     border:none;
@@ -855,42 +856,42 @@
   }
   .stop-tooltip::before{border-top-color:var(--ink) !important;}
   .me-dot{
-    width:16px;height:16px;
+    width:22px;height:22px;
     border-radius:50%;
     background:#1A73E8;
-    border:3px solid #fff;
-    box-shadow:0 0 0 4px rgba(26,115,232,0.35);
+    border:4px solid #fff;
+    box-shadow:0 0 0 5px rgba(26,115,232,0.35);
   }
   .home-icon{
-    width:26px;height:26px;
+    width:36px;height:36px;
     border-radius:50%;
     background:#fff;
-    border:2px solid var(--amber);
-    box-shadow:0 1px 4px rgba(0,0,0,0.4);
+    border:3px solid var(--amber);
+    box-shadow:0 1px 5px rgba(0,0,0,0.45);
     display:flex;align-items:center;justify-content:center;
-    font-size:14px;
+    font-size:19px;
     line-height:1;
   }
   .metro-icon{
-    width:22px;height:22px;
+    width:30px;height:30px;
     border-radius:50%;
     background:#0033A0;
-    border:2px solid #fff;
-    box-shadow:0 1px 4px rgba(0,0,0,0.45);
+    border:3px solid #fff;
+    box-shadow:0 1px 5px rgba(0,0,0,0.5);
     display:flex;align-items:center;justify-content:center;
     color:#fff;
     font-family:'Oswald',sans-serif;
     font-weight:700;
-    font-size:13px;
+    font-size:17px;
     line-height:1;
   }
   .bus-icon{
-    width:30px;height:30px;
+    width:38px;height:38px;
     border-radius:50%;
-    border:3px solid #fff;
-    box-shadow:0 2px 6px rgba(0,0,0,0.5);
+    border:4px solid #fff;
+    box-shadow:0 2px 7px rgba(0,0,0,0.55);
     display:flex;align-items:center;justify-content:center;
-    font-size:16px;
+    font-size:20px;
     line-height:1;
   }
 
@@ -1939,19 +1940,19 @@
   // ---------- static layers: built once, never depend on direction/destination ----------
   function buildStaticMapLayers(){
     const ps = SEGMENT_DATA.lines[0].piataSudului;
-    const endpointIcon = L.divIcon({ className:'', html:'<div class="stop-icon-endpoint"></div>', iconSize:[22,22] });
+    const endpointIcon = L.divIcon({ className:'', html:'<div class="stop-icon-endpoint"></div>', iconSize:[32,32] });
     L.marker([ps.lat, ps.lon], { icon: endpointIcon })
       .bindTooltip('Piața Sudului', { permanent:true, direction:'top', className:'stop-tooltip', offset:[0,-10] })
       .addTo(map);
 
-    const metroIcon = L.divIcon({ className:'', html:'<div class="metro-icon">M</div>', iconSize:[22,22] });
+    const metroIcon = L.divIcon({ className:'', html:'<div class="metro-icon">M</div>', iconSize:[30,30] });
     (SEGMENT_DATA.metroStations || []).forEach(m => {
       L.marker([m.lat, m.lon], { icon: metroIcon })
         .bindPopup('<b>M ' + m.name + '</b>')
         .addTo(map);
     });
 
-    const homeIcon = L.divIcon({ className:'', html:'<div class="home-icon">🏠</div>', iconSize:[26,26], iconAnchor:[13,13] });
+    const homeIcon = L.divIcon({ className:'', html:'<div class="home-icon">🏠</div>', iconSize:[36,36], iconAnchor:[18,18] });
     Object.values(SEGMENT_DATA.homes).forEach(home => {
       L.polyline(home.walkPath, { color: getVar('--amber'), weight:3, opacity:0.85, dashArray:'1 7' }).addTo(map);
       L.marker([home.lat, home.lon], { icon: homeIcon })
@@ -1997,7 +1998,7 @@
       return L.polyline(seg, { color: getVar('--route-continue'), weight: 4, opacity: 0.85, dashArray: '1 7' }).addTo(map);
     });
 
-    const endpointIcon = L.divIcon({ className:'', html:'<div class="stop-icon-endpoint"></div>', iconSize:[22,22] });
+    const endpointIcon = L.divIcon({ className:'', html:'<div class="stop-icon-endpoint"></div>', iconSize:[32,32] });
     mapLayers.destMarker = L.marker([dest.lat, dest.lon], { icon: endpointIcon })
       .bindTooltip(dest.displayName, { permanent:true, direction:'top', className:'stop-tooltip', offset:[0,-10] })
       .addTo(map);
@@ -2011,7 +2012,7 @@
       if (!destStop) return [];
       return line[stopsKey].filter(s => side === 'outbound' ? s.order <= destStop.order : s.order >= destStop.order);
     })).filter(s => s.key !== dest.key);
-    const midIcon = L.divIcon({ className:'', html:'<div class="stop-icon-mid"></div>', iconSize:[13,13] });
+    const midIcon = L.divIcon({ className:'', html:'<div class="stop-icon-mid"></div>', iconSize:[20,20] });
     mapLayers.midStops = midStops.map(s =>
       L.marker([s.lat, s.lon], { icon: midIcon }).bindPopup('<b>' + s.displayName + '</b>').addTo(map)
     );
@@ -2097,7 +2098,7 @@
     if (!pos) return;
 
     const color = active.line === '475' ? getVar('--red') : getVar('--teal');
-    const icon = L.divIcon({ className:'', html:'<div class="bus-icon" style="background:' + color + '">🚌</div>', iconSize:[30,30], iconAnchor:[15,15] });
+    const icon = L.divIcon({ className:'', html:'<div class="bus-icon" style="background:' + color + '">🚌</div>', iconSize:[38,38], iconAnchor:[19,19] });
     const label = currentDir === 'outbound'
       ? ('acum ' + formatMinutes(minutes) + ' de la plecare')
       : ('sosește la stație în ~' + formatMinutes(minutes));
@@ -2265,7 +2266,7 @@
       btn.classList.remove('busy');
       const { latitude, longitude } = pos.coords;
       lastMeLatLng = [latitude, longitude];
-      const meIcon = L.divIcon({ className:'', html:'<div class="me-dot"></div>', iconSize:[16,16] });
+      const meIcon = L.divIcon({ className:'', html:'<div class="me-dot"></div>', iconSize:[22,22] });
       if (meMarker) map.removeLayer(meMarker);
       meMarker = L.marker([latitude, longitude], { icon: meIcon, zIndexOffset: 1000 }).addTo(map);
 
