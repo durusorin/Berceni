@@ -469,14 +469,24 @@
     text-underline-offset:2px;
     opacity:0.9;
   }
+  .share-eta-row{
+    display:flex;
+    justify-content:center;
+    margin-top:14px;
+  }
   .share-eta-btn{
     border:none;
-    background:none;
-    font-family:inherit;
-    padding:0;
+    background:var(--card);
+    color:var(--ink-soft);
+    font-family:'Work Sans',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    padding:12px 20px;
+    border-radius:999px;
+    box-shadow:var(--shadow);
     cursor:pointer;
   }
-  .share-eta-btn.copied{opacity:1; color:#C7F2D9;}
+  .share-eta-btn.copied{background:var(--green); color:#fff;}
   .arrival-row{
     margin-top:8px;
     display:flex;
@@ -778,25 +788,6 @@
     text-decoration:underline;
     text-underline-offset:2px;
   }
-  .bike-route-link{
-    border:none;
-    background:transparent;
-    padding:0;
-    font-size:14.5px;
-    font-weight:600;
-    color:var(--ink-soft);
-    text-decoration:underline;
-    text-underline-offset:2px;
-    cursor:pointer;
-    font-family:'Work Sans',sans-serif;
-  }
-  .bike-route-link:disabled{opacity:0.5; cursor:default;}
-  #bikeRouteInfo{
-    display:block;
-    margin-top:4px;
-    font-size:12.5px;
-    color:var(--muted);
-  }
 
   /* leaflet custom controls */
   .locate-ctrl{
@@ -834,27 +825,27 @@
   .stop-icon-endpoint{
     width:32px;height:32px;
     border-radius:50%;
-    background:var(--stop-blue);
+    background:#1E3A8A;
     border:4px solid #fff;
     box-shadow:0 1px 5px rgba(0,0,0,0.5);
   }
   .stop-icon-mid{
     width:20px;height:20px;
     border-radius:50%;
-    background:var(--stop-blue);
+    background:var(--origin-accent);
     border:3px solid #fff;
     box-shadow:0 1px 4px rgba(0,0,0,0.4);
   }
   .stop-tooltip{
     font-family:'Work Sans',sans-serif;
     font-weight:700;
-    font-size:18px;
-    background:var(--ink);
+    font-size:21px;
+    background:#1E3A8A;
     color:#fff;
     border:none;
     box-shadow:var(--shadow);
   }
-  .stop-tooltip::before{border-top-color:var(--ink) !important;}
+  .stop-tooltip::before{border-top-color:#1E3A8A !important;}
   .me-dot{
     width:22px;height:22px;
     border-radius:50%;
@@ -1036,7 +1027,6 @@
         <span class="leave-home" id="leaveHomeLabel"></span>
       </div>
       <a class="calendar-link" id="calendarLink" href="#">🔔 Adaugă memento în Calendar</a>
-      <button class="calendar-link share-eta-btn" id="shareEtaBtn">📤 Trimite ETA</button>
     </div>
   </div>
 
@@ -1061,14 +1051,14 @@
     <div class="gmaps-link-row">
       <a id="gmapsLink" href="#" target="_blank" rel="noopener">🚦 Vezi traficul în Google Maps</a>
     </div>
-    <div class="gmaps-link-row">
-      <button class="bike-route-link" id="bikeRouteBtn">🚲 Traseu cu bicicleta: Cricovul Sărat ⇄ Mihai Bravu</button>
-      <span id="bikeRouteInfo"></span>
-    </div>
   </div>
 
   <div class="info-bar" id="infoBar">
     <a class="metro-map-link" href="https://www.metrorex.ro/storage/documents/1746816849HartaMtx%202024.pdf" target="_blank" rel="noopener" title="Harta Metrorex">M</a>
+  </div>
+
+  <div class="share-eta-row">
+    <button class="share-eta-btn" id="shareEtaBtn">📤 Trimite ETA</button>
   </div>
 
   <div class="analog-clock-row">
@@ -1125,7 +1115,6 @@
   let reminderFiredFor = null, reminderFiredDate = null;
   let calendarBlobUrl = null;
   let meLineRequestId = 0;
-  let bikeRouteLayer = null;
   let audioCtx = null;
   let shareEtaText = '';
 
@@ -2028,7 +2017,7 @@
     $('#mapLegend').innerHTML = `
       <span><i class="swatch" style="background:${getVar('--route-main')}"></i>Traseul tău</span>
       <span><i class="swatch" style="background:${getVar('--route-continue')}"></i>${continuationLabel}</span>
-      <span><i class="swatch dot" style="background:${getVar('--stop-blue')};border:2px solid #fff"></i>Stație</span>
+      <span><i class="swatch dot" style="background:${getVar('--origin-accent')};border:2px solid #fff"></i>Stație</span>
       <span><i class="swatch" style="background:${getVar('--amber')}"></i>Traseu pe jos de-acasă</span>
     `;
   }
@@ -2205,44 +2194,6 @@
     }
   }
 
-  async function showBikeRoute(){
-    const btn = $('#bikeRouteBtn');
-    const info = $('#bikeRouteInfo');
-    btn.disabled = true;
-    info.textContent = 'Se calculează traseul…';
-
-    const mapEl = $('#map');
-    if (!mapEl.classList.contains('open')){
-      $('#mapToggle').click();
-      await new Promise(r => setTimeout(r, 320));
-    }
-    if (!map) initMap();
-
-    const home1 = SEGMENT_DATA.homes.bucuresti;
-    const home2 = SEGMENT_DATA.homes.berceni;
-    try {
-      const url = `https://routing.openstreetmap.de/routed-bike/route/v1/bike/${home1.lon},${home1.lat};${home2.lon},${home2.lat}?overview=full&geometries=geojson`;
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('status ' + resp.status);
-      const data = await resp.json();
-      const route = data.routes && data.routes[0];
-      if (!route) throw new Error('no route');
-      const coords = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
-
-      if (bikeRouteLayer) map.removeLayer(bikeRouteLayer);
-      bikeRouteLayer = L.polyline(coords, { color: '#D6409F', weight: 4, opacity: 0.9, dashArray: '6 6' }).addTo(map);
-      map.fitBounds(bikeRouteLayer.getBounds(), { padding: [30, 30] });
-
-      const km = (route.distance / 1000).toFixed(1);
-      const min = Math.ceil(route.duration / 60);
-      info.textContent = `~${km} km, ~${formatMinutes(min)} cu bicicleta`;
-    } catch (e){
-      info.textContent = 'Nu am putut calcula traseul — verifică internetul.';
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
   function addLocateControl(){
     const ctrl = L.control({ position: 'topright' });
     ctrl.onAdd = function(){
@@ -2282,7 +2233,6 @@
 
   function wireEvents(){
     $('#reminderDismiss').addEventListener('click', hideReminderBanner);
-    $('#bikeRouteBtn').addEventListener('click', showBikeRoute);
 
     $('#shareEtaBtn').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
