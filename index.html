@@ -31,6 +31,7 @@
     --route-orange:#FF9F43;
     --line:#DDD8C9;
     --muted:#726C5E;
+    --origin-accent:#6D28D9;
     --dirswitch-bg:#E4E0D2;
     --shadow: 0 1px 2px rgba(20,33,61,0.06), 0 8px 24px -12px rgba(20,33,61,0.25);
     --radius: 16px;
@@ -545,6 +546,57 @@
     color:var(--text);
     background:var(--card);
   }
+  .origin-metro-section{
+    margin:-6px 4px 14px;
+  }
+  .origin-metro-toggle{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    border:none;
+    background:var(--origin-accent, #6D28D9);
+    color:#fff;
+    font-family:'Work Sans',sans-serif;
+    font-weight:700;
+    font-size:15.5px;
+    padding:13px 16px;
+    border-radius:12px;
+    box-shadow:0 4px 14px -4px rgba(109,40,217,0.55);
+    cursor:pointer;
+  }
+  .origin-metro-toggle .chev{
+    flex-shrink:0;
+    transition:transform .2s ease;
+  }
+  .origin-metro-toggle.open .chev{transform:rotate(180deg);}
+  .origin-metro-chips{
+    display:none;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:8px;
+  }
+  .origin-metro-chips.open{display:flex;}
+  .origin-metro-chip{
+    flex:1 1 auto;
+    min-width:130px;
+    border:2px solid var(--origin-accent, #6D28D9);
+    background:var(--card);
+    color:var(--origin-accent, #6D28D9);
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:15px;
+    padding:12px 10px;
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    cursor:pointer;
+    text-align:center;
+  }
+  .origin-metro-chip:active{transform:scale(0.97);}
+  .origin-metro-chip.active{
+    background:var(--origin-accent, #6D28D9);
+    color:#fff;
+  }
   .approx-note{
     font-size:13px;
     opacity:0.7;
@@ -947,11 +999,12 @@
     </div>
   </div>
 
-  <div class="alt-stop-row" id="originMetroRow">
-    <button class="alt-stop-link" id="originMetroLink">Vin de la altă stație de metrou ▾</button>
-    <div class="alt-stop-picker" id="originMetroPicker">
-      <select id="originMetroSelect"></select>
-    </div>
+  <div class="origin-metro-section" id="originMetroSection">
+    <button class="origin-metro-toggle" id="originMetroToggle">
+      <span id="originMetroToggleText">🚇 Vin de la altă stație de metrou</span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="origin-metro-chips" id="originMetroChips"></div>
   </div>
 
   <div class="hero">
@@ -1493,21 +1546,36 @@
     sel.value = selectedDestKey;
   }
 
+  function selectOriginMetro(name){
+    selectedOriginMetro = name ? (SEGMENT_DATA.metroStations || []).find(m => m.name === name) || null : null;
+    pinnedDeparture = null;
+    $('#originMetroChips').classList.remove('open');
+    $('#originMetroToggle').classList.remove('open');
+    populateOriginMetroSelect();
+    render();
+    if (map) buildDynamicMapLayers();
+    updateMeLineForCurrentDir();
+  }
+
   function populateOriginMetroSelect(){
-    const sel = $('#originMetroSelect');
-    sel.innerHTML = '';
-    const defOpt = document.createElement('option');
-    defOpt.value = '';
-    defOpt.textContent = 'Piața Sudului (implicit)';
-    sel.appendChild(defOpt);
-    (SEGMENT_DATA.metroStations || []).forEach(m => {
-      if (m.name === 'Piața Sudului') return;
-      const opt = document.createElement('option');
-      opt.value = m.name;
-      opt.textContent = m.name;
-      sel.appendChild(opt);
+    const wrap = $('#originMetroChips');
+    wrap.innerHTML = '';
+    const stations = [{ name: '', label: 'Piața Sudului (implicit)' }].concat(
+      (SEGMENT_DATA.metroStations || [])
+        .filter(m => m.name !== 'Piața Sudului')
+        .map(m => ({ name: m.name, label: m.name }))
+    );
+    const currentName = selectedOriginMetro ? selectedOriginMetro.name : '';
+    stations.forEach(s => {
+      const btn = document.createElement('button');
+      btn.className = 'origin-metro-chip' + (s.name === currentName ? ' active' : '');
+      btn.textContent = s.label;
+      btn.addEventListener('click', () => selectOriginMetro(s.name));
+      wrap.appendChild(btn);
     });
-    sel.value = selectedOriginMetro ? selectedOriginMetro.name : '';
+    $('#originMetroToggleText').textContent = selectedOriginMetro
+      ? ('🚇 Vin de la ' + selectedOriginMetro.name)
+      : '🚇 Vin de la altă stație de metrou';
   }
 
   function render(){
@@ -1520,7 +1588,7 @@
 
     $('#stopNameLabel').textContent = 'din ' + stopLabel();
     $('#metaDestLabel').textContent = otherEndLabel();
-    $('#originMetroRow').style.display = currentDir === 'outbound' ? '' : 'none';
+    $('#originMetroSection').style.display = currentDir === 'outbound' ? '' : 'none';
     const gFrom = originCoords();
     const gTo = currentDir === 'outbound' ? destOption() : SEGMENT_DATA.lines[0].piataSudului;
     $('#gmapsLink').href = `https://www.google.com/maps/dir/?api=1&origin=${gFrom.lat},${gFrom.lon}&destination=${gTo.lat},${gTo.lon}&travelmode=transit`;
@@ -2280,17 +2348,9 @@
       updateMeLineForCurrentDir();
     });
 
-    $('#originMetroLink').addEventListener('click', () => {
-      $('#originMetroPicker').classList.toggle('open');
-    });
-
-    $('#originMetroSelect').addEventListener('change', (e) => {
-      const name = e.target.value;
-      selectedOriginMetro = name ? (SEGMENT_DATA.metroStations || []).find(m => m.name === name) || null : null;
-      pinnedDeparture = null;
-      render();
-      if (map) buildDynamicMapLayers();
-      updateMeLineForCurrentDir();
+    $('#originMetroToggle').addEventListener('click', () => {
+      $('#originMetroChips').classList.toggle('open');
+      $('#originMetroToggle').classList.toggle('open');
     });
 
     $('#mapToggle').addEventListener('click', () => {
