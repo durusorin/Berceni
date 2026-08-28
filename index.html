@@ -947,6 +947,13 @@
     </div>
   </div>
 
+  <div class="alt-stop-row" id="originMetroRow">
+    <button class="alt-stop-link" id="originMetroLink">Vin de la altă stație de metrou ▾</button>
+    <div class="alt-stop-picker" id="originMetroPicker">
+      <select id="originMetroSelect"></select>
+    </div>
+  </div>
+
   <div class="hero">
     <div class="eyebrow"><span class="dot"></span> <span id="heroTitle">Următorul autobuz</span><span class="pin-hint" id="pinHint"></span></div>
     <div class="skip-note" id="skipNote"></div>
@@ -1057,6 +1064,7 @@
 
   let currentDir = 'outbound'; // 'outbound' = spre dest (board at Piata Sudului); 'inbound' = spre Piata Sudului (board at dest)
   let selectedDestKey = DEFAULT_DEST_KEY;
+  let selectedOriginMetro = null; // null = default (Piața Sudului); otherwise a metroStations entry you boarded near instead
   let pinnedDeparture = null; // {h,m,line,label,mfm} or null = auto (next bus)
   let map = null, mapLayers = {}, meMarker = null, meLine = null, lastMeLatLng = null;
   let tickTimer = null;
@@ -1183,11 +1191,44 @@
     return SEGMENT_DATA.lines.filter(line => (side === 'outbound' ? line.outboundStops : line.inboundStops).some(s => s.key === key));
   }
 
+  // finds the outboundStops key nearest to a given point — used to resolve which bus
+  // stop to board from when starting from a metro station other than Piața Sudului
+  function nearestOutboundStopKey(lat, lon){
+    let best = null, bestD = Infinity;
+    SEGMENT_DATA.lines[0].outboundStops.forEach(s => {
+      const d = haversine(lat, lon, s.lat, s.lon);
+      if (d < bestD){ bestD = d; best = s; }
+    });
+    return best ? best.key : null;
+  }
+
+  // the boarding stop key when a custom metro-station origin is selected, or null for
+  // the default (Piața Sudului itself)
+  function originStopKey(){
+    return selectedOriginMetro ? nearestOutboundStopKey(selectedOriginMetro.lat, selectedOriginMetro.lon) : null;
+  }
+
+  function originStopInfo(){
+    const key = originStopKey();
+    if (!key) return null;
+    for (const line of SEGMENT_DATA.lines){
+      const stop = line.outboundStops.find(s => s.key === key);
+      if (stop) return stop;
+    }
+    return null;
+  }
+
   function mergedDepartures(dayType){
     let out = [];
     if (currentDir === 'outbound'){
+      const key = originStopKey();
       servingLines('outbound').forEach(line => {
-        out = out.concat(flatDepartures(line.piataSuduluiSchedule[dayType] || {}, line.line));
+        if (key){
+          const stop = line.outboundStops.find(s => s.key === key);
+          if (stop) out = out.concat(flatDepartures(stop.schedule[dayType] || {}, line.line));
+        } else {
+          out = out.concat(flatDepartures(line.piataSuduluiSchedule[dayType] || {}, line.line));
+        }
       });
     } else {
       servingLines('inbound').forEach(line => {
@@ -1222,7 +1263,14 @@
 
     let depSchedule, arrSchedule;
     if (currentDir === 'outbound'){
-      depSchedule = line.piataSuduluiSchedule;
+      const originKey = originStopKey();
+      if (originKey){
+        const boardStop = line.outboundStops.find(s => s.key === originKey);
+        if (!boardStop || !boardStop.schedule) return null;
+        depSchedule = boardStop.schedule;
+      } else {
+        depSchedule = line.piataSuduluiSchedule;
+      }
       const destStop = line.outboundStops.find(s => s.key === selectedDestKey);
       if (!destStop || !destStop.schedule) return null;
       arrSchedule = destStop.schedule;
@@ -1247,7 +1295,11 @@
   }
 
   function stopLabel(){
-    return currentDir === 'outbound' ? 'Piața Sudului' : destOption().displayName;
+    if (currentDir === 'outbound'){
+      const info = originStopInfo();
+      return info ? info.displayName : 'Piața Sudului';
+    }
+    return destOption().displayName;
   }
 
   function otherEndLabel(){
@@ -1255,7 +1307,11 @@
   }
 
   function originCoords(){
-    return currentDir === 'outbound' ? SEGMENT_DATA.lines[0].piataSudului : destOption();
+    if (currentDir === 'outbound'){
+      const info = originStopInfo();
+      return info ? { lat: info.lat, lon: info.lon } : SEGMENT_DATA.lines[0].piataSudului;
+    }
+    return destOption();
   }
 
   function homeForDirection(){
@@ -1290,6 +1346,10 @@
 
   // returns {minutes, approx} — precise traced-path minutes for the default stop, heuristic otherwise
   function walkMinutesForCurrentTrip(){
+    if (currentDir === 'outbound' && selectedOriginMetro){
+      const stop = originCoords();
+      return { minutes: walkMinutes(selectedOriginMetro.lat, selectedOriginMetro.lon, stop.lat, stop.lon), approx: true };
+    }
     const home = homeForDirection();
     if (currentDir === 'outbound' || selectedDestKey === DEFAULT_DEST_KEY){
       return { minutes: walkMinutesFromMeters(home.walkMeters), approx: false };
@@ -1433,6 +1493,23 @@
     sel.value = selectedDestKey;
   }
 
+  function populateOriginMetroSelect(){
+    const sel = $('#originMetroSelect');
+    sel.innerHTML = '';
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = 'Piața Sudului (implicit)';
+    sel.appendChild(defOpt);
+    (SEGMENT_DATA.metroStations || []).forEach(m => {
+      if (m.name === 'Piața Sudului') return;
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    });
+    sel.value = selectedOriginMetro ? selectedOriginMetro.name : '';
+  }
+
   function render(){
     const dayType = todayDayType();
     const nowMfm = currentMinutesFromMidnight();
@@ -1443,6 +1520,7 @@
 
     $('#stopNameLabel').textContent = 'din ' + stopLabel();
     $('#metaDestLabel').textContent = otherEndLabel();
+    $('#originMetroRow').style.display = currentDir === 'outbound' ? '' : 'none';
     const gFrom = originCoords();
     const gTo = currentDir === 'outbound' ? destOption() : SEGMENT_DATA.lines[0].piataSudului;
     $('#gmapsLink').href = `https://www.google.com/maps/dir/?api=1&origin=${gFrom.lat},${gFrom.lon}&destination=${gTo.lat},${gTo.lon}&travelmode=transit`;
@@ -1509,7 +1587,9 @@
           arrivalRow.style.display = 'none';
         }
 
-        const home = homeForDirection();
+        const home = (currentDir === 'outbound' && selectedOriginMetro)
+          ? { label: selectedOriginMetro.name }
+          : homeForDirection();
         const { minutes: walkMin, approx } = walkMinutesForCurrentTrip();
         const leaveMfm = active.mfm - walkMin;
         const leaveRow = $('#leaveRow');
@@ -2200,6 +2280,19 @@
       updateMeLineForCurrentDir();
     });
 
+    $('#originMetroLink').addEventListener('click', () => {
+      $('#originMetroPicker').classList.toggle('open');
+    });
+
+    $('#originMetroSelect').addEventListener('change', (e) => {
+      const name = e.target.value;
+      selectedOriginMetro = name ? (SEGMENT_DATA.metroStations || []).find(m => m.name === name) || null : null;
+      pinnedDeparture = null;
+      render();
+      if (map) buildDynamicMapLayers();
+      updateMeLineForCurrentDir();
+    });
+
     $('#mapToggle').addEventListener('click', () => {
       const mapEl = $('#map');
       const opening = !mapEl.classList.contains('open');
@@ -2380,6 +2473,7 @@
 
   try {
     populateAltStopSelect();
+    populateOriginMetroSelect();
     updateDestLabels();
     wireEvents();
     buildClockFace();
