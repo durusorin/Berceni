@@ -656,18 +656,18 @@
     font-size:19px;
     padding:11px 14px;
     border-radius:10px;
-    background:var(--card);
-    box-shadow:var(--shadow);
-    color:var(--ink-soft);
+    color:#fff;
     display:flex;
     align-items:center;
     gap:7px;
     cursor:pointer;
-    border:2px solid transparent;
+    border:3px solid transparent;
     transition:transform .12s ease;
     scroll-snap-align:start;
     white-space:nowrap;
   }
+  .chip.l475{background:var(--red);}
+  .chip.l438{background:var(--teal);}
   .chip:active{transform:scale(0.96);}
   .chip .ltag{
     font-family:'Oswald',sans-serif;
@@ -675,17 +675,13 @@
     font-weight:700;
     padding:2px 6px;
     border-radius:5px;
-    color:#fff;
+    background:rgba(255,255,255,0.25);
   }
-  .chip .ltag.l475{background:var(--red);}
-  .chip .ltag.l438{background:var(--teal);}
   .chip.active{
-    background:var(--red);
-    color:#fff;
-    box-shadow:0 4px 14px -4px rgba(214,40,40,0.6);
+    border-color:#fff;
+    box-shadow:0 4px 14px -4px rgba(0,0,0,0.6);
   }
-  .chip.active .ltag{background:rgba(255,255,255,0.28);}
-  .chip.pinned{border-color:var(--ink);}
+  .chip.pinned{border-color:var(--amber);}
   .empty-note{
     font-size:16.5px;
     color:var(--muted);
@@ -1694,11 +1690,11 @@
       chips.className = 'chips';
       deps.forEach(d => {
         const chip = document.createElement('div');
-        chip.className = 'chip';
+        chip.className = 'chip l' + d.line;
         if (active && d.mfm === active.mfm && d.line === active.line) chip.classList.add('active');
         if (pinnedDeparture && d.mfm === pinnedDeparture.mfm && d.line === pinnedDeparture.line) chip.classList.add('pinned');
         const ltag = document.createElement('span');
-        ltag.className = 'ltag l' + d.line;
+        ltag.className = 'ltag';
         ltag.textContent = d.line;
         chip.appendChild(ltag);
         chip.appendChild(document.createTextNode(d.label));
