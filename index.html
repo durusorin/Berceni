@@ -1545,6 +1545,7 @@
     render();
     if (map) buildDynamicMapLayers();
     updateMeLineForCurrentDir();
+    updateWalkRouteLayer();
   }
 
   function populateOriginMetroSelect(){
@@ -1943,11 +1944,50 @@
 
     const homeIcon = L.divIcon({ className:'', html:'<div class="home-icon">🏠</div>', iconSize:[36,36], iconAnchor:[18,18] });
     Object.values(SEGMENT_DATA.homes).forEach(home => {
-      L.polyline(home.walkPath, { color: getVar('--amber'), weight:3, opacity:0.85, dashArray:'1 7' }).addTo(map);
       L.marker([home.lat, home.lon], { icon: homeIcon })
         .bindTooltip('Acasă · ' + home.label, { direction:'top', className:'stop-tooltip', offset:[0,-10] })
         .addTo(map);
     });
+  }
+
+  // walking origin for the current context: the metro station you picked (if any,
+  // outbound only), otherwise the relevant home — mirrors walkMinutesForCurrentTrip()
+  function walkOriginCoords(){
+    if (currentDir === 'outbound' && selectedOriginMetro){
+      return { lat: selectedOriginMetro.lat, lon: selectedOriginMetro.lon };
+    }
+    const home = homeForDirection();
+    return { lat: home.lat, lon: home.lon };
+  }
+
+  let walkRouteLayer = null;
+  let walkRouteRequestId = 0;
+
+  // real pedestrian route (via OSM routing), replacing the old fixed traced-path line —
+  // this way it stays correct even when boarding from a different metro station, not just home
+  async function updateWalkRouteLayer(){
+    if (!map) return;
+    const myRequestId = ++walkRouteRequestId;
+    const origin = walkOriginCoords();
+    const target = originCoords();
+    try {
+      const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${origin.lon},${origin.lat};${target.lon},${target.lat}?overview=full&geometries=geojson`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('status ' + resp.status);
+      const data = await resp.json();
+      const route = data.routes && data.routes[0];
+      if (!route) throw new Error('no route');
+      if (myRequestId !== walkRouteRequestId) return; // superseded by a newer request
+      const coords = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+      if (walkRouteLayer) map.removeLayer(walkRouteLayer);
+      walkRouteLayer = L.polyline(coords, { color: getVar('--amber'), weight:3, opacity:0.85, dashArray:'1 7' }).addTo(map);
+    } catch (e){
+      // nice-to-have overlay; fail silently if offline or API unreachable
+      if (myRequestId === walkRouteRequestId && walkRouteLayer){
+        map.removeLayer(walkRouteLayer);
+        walkRouteLayer = null;
+      }
+    }
   }
 
   // ---------- dynamic layers: rebuilt whenever the destination stop changes ----------
@@ -2122,6 +2162,7 @@
     tileLayers[currentTileKey].addTo(map);
     buildStaticMapLayers();
     buildDynamicMapLayers();
+    updateWalkRouteLayer();
     addLocateControl();
     addTileSwitchControl();
   }
@@ -2273,6 +2314,7 @@
         render();
         if (map) buildDynamicMapLayers();
         updateMeLineForCurrentDir();
+        updateWalkRouteLayer();
       });
     });
 
@@ -2297,6 +2339,7 @@
       render();
       if (map) buildDynamicMapLayers();
       updateMeLineForCurrentDir();
+      updateWalkRouteLayer();
     });
 
     $('#originMetroToggle').addEventListener('click', () => {
