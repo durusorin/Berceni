@@ -236,33 +236,25 @@
     background:radial-gradient(circle, rgba(214,40,40,0.35), transparent 70%);
     pointer-events:none;
   }
-  .lcars-panel{
-    background:#FFCC66;
-    color:#14213D;
-    border-radius:18px 18px 0 0;
-    padding:14px 18px 14px;
-    margin:-16px -18px 12px;
-    position:relative;
-  }
   .hero .eyebrow{
     font-size:13px;
     letter-spacing:1.2px;
     text-transform:uppercase;
-    color:#5A4A1E;
-    font-weight:700;
+    color:#B9C2D6;
+    font-weight:600;
     display:flex;
     align-items:center;
     gap:8px;
   }
   .hero .eyebrow .dot{
     width:7px;height:7px;border-radius:50%;
-    background:#1F8A4C;
-    box-shadow:0 0 0 3px rgba(31,138,76,0.25);
+    background:#5FD98A;
+    box-shadow:0 0 0 3px rgba(95,217,138,0.25);
   }
   .hero .eyebrow .pin-hint{
     margin-left:auto;
-    font-weight:600;
-    color:#7A6522;
+    font-weight:500;
+    color:#8890A6;
     text-transform:none;
     letter-spacing:0;
     font-size:12.5px;
@@ -272,7 +264,7 @@
     margin-top:8px;
     font-size:12.5px;
     font-style:italic;
-    color:#7A1010;
+    color:#FFD8D8;
     line-height:1.4;
   }
   .last-bus-note{
@@ -280,8 +272,8 @@
     margin-top:8px;
     padding:7px 11px;
     border-radius:10px;
-    background:var(--red);
-    color:#fff;
+    background:rgba(214,40,40,0.35);
+    color:#FFD8D8;
     font-size:13.5px;
     font-weight:700;
     line-height:1.4;
@@ -381,8 +373,8 @@
     font-family:'Oswald',sans-serif;
     font-weight:600;
     font-size:17px;
-    color:#fff;
-    background:var(--red);
+    color:#FFD8D8;
+    background:rgba(214,40,40,0.35);
     padding:4px 10px 5px;
     border-radius:999px;
     white-space:nowrap;
@@ -395,13 +387,13 @@
     border-radius:999px;
     white-space:nowrap;
   }
-  .next-line-tag.l475{background:var(--red); color:#fff;}
-  .next-line-tag.l438{background:var(--teal); color:#fff;}
+  .next-line-tag.l475{background:rgba(214,40,40,0.35); color:#FFD8D8;}
+  .next-line-tag.l438{background:rgba(42,127,118,0.4); color:#BEEFE8;}
   .hero .meta{
     margin-top:10px;
     font-size:18.5px;
     font-weight:700;
-    color:#5A4A1E;
+    color:var(--route-orange);
     display:flex;
     justify-content:space-between;
     gap:8px;
@@ -418,7 +410,7 @@
     flex:1;
     min-width:28px;
     height:0;
-    border-top:2px dashed #5A4A1E;
+    border-top:2px dashed var(--route-orange);
     position:relative;
     margin:0 6px;
   }
@@ -428,11 +420,11 @@
     right:-1px;
     top:50%;
     transform:translateY(-50%);
-    border-left:7px solid #5A4A1E;
+    border-left:7px solid var(--route-orange);
     border-top:5px solid transparent;
     border-bottom:5px solid transparent;
   }
-  .hero .meta b{color:#14213D; font-weight:700;}
+  .hero .meta b{color:#fff; font-weight:600;}
   .daytype-tag{
     font-size:15px;
     font-weight:600;
@@ -506,11 +498,11 @@
     border-radius:12px;
     font-size:16.5px;
     font-weight:600;
-    background:rgba(20,33,61,0.1);
-    color:#14213D;
+    background:rgba(255,255,255,0.1);
+    color:#E4E7EF;
   }
   .arrival-time-main{
-    color:#0D4F73;
+    color:var(--stop-blue);
     font-weight:700;
     font-size:19px;
   }
@@ -1011,26 +1003,24 @@
   </div>
 
   <div class="hero">
-    <div class="lcars-panel">
-      <div class="eyebrow"><span class="dot"></span> <span id="heroTitle">Următorul autobuz</span><span class="pin-hint" id="pinHint"></span></div>
-      <div class="skip-note" id="skipNote"></div>
-      <div class="last-bus-note" id="lastBusNote"></div>
-      <div class="flipwrap">
-        <div class="flip-time mono" id="nextTime">--:--</div>
-        <div class="eta" id="nextEta">—</div>
-        <div class="next-line-tag" id="nextLineTag"></div>
-      </div>
-      <div class="meta">
-        <span class="meta-route">
-          <span id="stopNameLabel">—</span>
-          <span class="meta-arrow-line"></span>
-          <span id="metaDestLabel">—</span>
-        </span>
-      </div>
-      <div class="arrival-row" id="arrivalRow">
-        <span id="arrivalDuration">—</span>
-        <span class="arrival-time-main">Sosire <span id="arrivalTime">--:--</span></span>
-      </div>
+    <div class="eyebrow"><span class="dot"></span> <span id="heroTitle">Următorul autobuz</span><span class="pin-hint" id="pinHint"></span></div>
+    <div class="skip-note" id="skipNote"></div>
+    <div class="last-bus-note" id="lastBusNote"></div>
+    <div class="flipwrap">
+      <div class="flip-time mono" id="nextTime">--:--</div>
+      <div class="eta" id="nextEta">—</div>
+      <div class="next-line-tag" id="nextLineTag"></div>
+    </div>
+    <div class="meta">
+      <span class="meta-route">
+        <span id="stopNameLabel">—</span>
+        <span class="meta-arrow-line"></span>
+        <span id="metaDestLabel">—</span>
+      </span>
+    </div>
+    <div class="arrival-row" id="arrivalRow">
+      <span id="arrivalDuration">—</span>
+      <span class="arrival-time-main">Sosire <span id="arrivalTime">--:--</span></span>
     </div>
     <div class="leave-row" id="leaveRow">
       <div class="leave-status" id="leaveStatus">—</div>
