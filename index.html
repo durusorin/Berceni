@@ -524,6 +524,15 @@
     color:var(--muted);
     margin:0 4px 8px;
   }
+  .dep-count{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:15.5px;
+    letter-spacing:0.2px;
+    color:var(--text);
+    margin:0 4px 7px;
+  }
+  .dep-count:empty{display:none;}
   .alt-stop-row{
     margin:-6px 4px 12px;
   }
@@ -1036,6 +1045,7 @@
   <div class="section-title">
     <span id="depTitle">Plecări de azi</span>
   </div>
+  <div id="depCount" class="dep-count"></div>
   <div class="section-hint">Atinge o oră (sau alege din listă) ca să vezi până când poți pleca de-acasă</div>
   <div class="dep-select-row">
     <label for="depSelect">Sari la</label>
@@ -1593,6 +1603,15 @@
     topbarClockEl.className = 'topbar-clock daytype-' + dayCat;
     $('#clockDate').title = holidayInfo ? holidayInfo.name : '';
     $('#depTitle').textContent = 'Plecări rămase azi · ' + stopLabel();
+
+    const depCountEl = $('#depCount');
+    if (deps.length > 1){
+      depCountEl.textContent = 'încă ' + deps.length + ' curse · ultima ' + deps[deps.length - 1].label;
+    } else if (deps.length === 1){
+      depCountEl.textContent = 'ultima cursă azi · ' + deps[0].label;
+    } else {
+      depCountEl.textContent = '';
+    }
 
     const tooSoon = deps[0] && (deps[0].mfm - nowMfm) < MIN_CATCHABLE_MIN ? deps[0] : null;
     const autoNext = deps.find(d => d.mfm - nowMfm >= MIN_CATCHABLE_MIN) || deps[0];
