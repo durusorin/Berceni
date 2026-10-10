@@ -533,6 +533,41 @@
     margin:0 4px 7px;
   }
   .dep-count:empty{display:none;}
+  /* „unde sunt acum”: butonul și cardul cu stația cea mai apropiată */
+  .here-row{ margin:10px 0 2px; }
+  .here-btn{
+    width:100%;
+    border:1.5px solid var(--origin-accent);
+    background:transparent;
+    color:var(--origin-accent);
+    border-radius:12px;
+    padding:10px 12px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .here-btn.on{ background:var(--origin-accent); color:#fff; }
+  .here-btn.busy{ opacity:0.6; }
+  .here-card{
+    margin:8px 0 4px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-left:4px solid var(--origin-accent);
+    border-radius:12px;
+    padding:10px 12px;
+    font-size:14.5px;
+    line-height:1.45;
+    box-shadow:var(--shadow);
+  }
+  .here-card.hidden{ display:none; }
+  .here-card .here-stop{ font-size:16px; font-weight:800; }
+  .here-card .here-sub{ color:var(--muted); font-size:13px; }
+  .here-card .here-dir{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
+  .here-card .here-dir-title{ font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+  .here-card .here-bus{ display:flex; align-items:baseline; gap:8px; }
+  .here-card .here-bus b{ font-size:17px; }
+  .here-card .here-none{ color:var(--muted); }
+
   .alt-stop-row{
     margin:-6px 4px 12px;
   }
@@ -996,6 +1031,11 @@
     <button data-dir="inbound">Spre Piața Sudului</button>
   </div>
 
+  <div class="here-row">
+    <button class="here-btn" id="hereBtn">📍 Unde sunt? Găsește stația cea mai apropiată</button>
+  </div>
+  <div class="here-card hidden" id="hereCard"></div>
+
   <div class="alt-stop-row">
     <button class="alt-stop-link" id="altStopLink">Altă stație din Berceni ▾</button>
     <div class="alt-stop-picker" id="altStopPicker">
@@ -1130,6 +1170,13 @@
   let meLineRequestId = 0;
   let audioCtx = null;
   let shareEtaText = '';
+  // „Unde sunt acum”: cât e pornit, stația de urcare e cea mai apropiată de poziția reală
+  // (nu cea aleasă de mână), iar drumul pe jos se socotește de unde ești, nu de acasă.
+  let herePos = null;        // { lat, lon, accuracy } — ultima poziție primită
+  let hereWatchId = null;    // id-ul urmăririi poziției, cât e pornit modul
+  let hereWalk = {};         // { outbound: {minutes, meters, approx}, inbound: {...} } până la stația fiecărui sens
+  let hereRouteRequestId = 0;
+  let destBeforeHere = null; // stația aleasă de mână înainte de a porni modul, ca să revenim la ea
 
   const $ = (sel) => document.querySelector(sel);
 
@@ -1261,6 +1308,13 @@
   // the boarding stop key when a custom metro-station origin is selected, or null for
   // the default (Piața Sudului itself)
   function originStopKey(){
+    if (herePos){
+      // lângă Piața Sudului rămâne capătul de linie; altfel, stația cea mai apropiată de tine
+      const ps = SEGMENT_DATA.lines[0].piataSudului;
+      const stop = nearestStopOnSide(herePos.lat, herePos.lon, 'outbound');
+      if (!stop || haversine(herePos.lat, herePos.lon, ps.lat, ps.lon) <= haversine(herePos.lat, herePos.lon, stop.lat, stop.lon)) return null;
+      return stop.key;
+    }
     return selectedOriginMetro ? nearestOutboundStopKey(selectedOriginMetro.lat, selectedOriginMetro.lon) : null;
   }
 
@@ -1345,6 +1399,18 @@
     return arrList[Math.min(idx, arrList.length - 1)];
   }
 
+  // la sensul „spre Berceni”, cu stația de urcare aleasă după poziție, se poate întâmpla
+  // să fii deja dincolo de stația de destinație — atunci ora de sosire nu are sens
+  function boardsBeforeDest(active){
+    if (currentDir !== 'outbound') return true;
+    const key = originStopKey();
+    if (!key) return true;
+    const line = SEGMENT_DATA.lines.find(l => l.line === active.line);
+    const from = line && line.outboundStops.find(s => s.key === key);
+    const to = line && line.outboundStops.find(s => s.key === selectedDestKey);
+    return !!(from && to && from.order < to.order);
+  }
+
   function currentMinutesFromMidnight(){
     const now = new Date();
     return now.getHours()*60 + now.getMinutes();
@@ -1353,7 +1419,7 @@
   function stopLabel(){
     if (currentDir === 'outbound'){
       const info = originStopInfo();
-      return info ? info.displayName : 'Piața Sudului';
+      return info ? stopNiceName(info) : 'Piața Sudului';
     }
     return destOption().displayName;
   }
@@ -1402,6 +1468,12 @@
 
   // returns {minutes, approx} — precise traced-path minutes for the default stop, heuristic otherwise
   function walkMinutesForCurrentTrip(){
+    if (herePos){
+      const w = hereWalk[currentDir];
+      if (w) return { minutes: w.minutes, approx: w.approx };
+      const stop = originCoords();
+      return { minutes: walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon), approx: true };
+    }
     if (currentDir === 'outbound' && selectedOriginMetro){
       const stop = originCoords();
       return { minutes: walkMinutes(selectedOriginMetro.lat, selectedOriginMetro.lon, stop.lat, stop.lon), approx: true };
@@ -1532,7 +1604,10 @@
   function updateDestLabels(){
     // only the direction button reflects the actually-selected stop, since that's
     // what matters functionally
-    const d = destOption();
+    // cu poziția pornită, pe sensul spre Piața Sudului „stația aleasă” e cea de urcare;
+    // butonul celuilalt sens trebuie să arate în continuare destinația ta
+    const destKey = herePos ? (destBeforeHere || DEFAULT_DEST_KEY) : selectedDestKey;
+    const d = SEGMENT_DATA.stopOptions.find(o => o.key === destKey) || destOption();
     const btn = document.querySelector('#dirSwitch button[data-dir="outbound"]');
     if (btn) btn.textContent = 'Spre ' + d.displayName;
   }
@@ -1613,8 +1688,10 @@
       depCountEl.textContent = '';
     }
 
-    const tooSoon = deps[0] && (deps[0].mfm - nowMfm) < MIN_CATCHABLE_MIN ? deps[0] : null;
-    const autoNext = deps.find(d => d.mfm - nowMfm >= MIN_CATCHABLE_MIN) || deps[0];
+    // cu poziția reală știm exact cât ai de mers până la stație; fără ea, rămâne pragul fix
+    const catchMin = herePos ? Math.max(1, walkMinutesForCurrentTrip().minutes) : MIN_CATCHABLE_MIN;
+    const tooSoon = deps[0] && (deps[0].mfm - nowMfm) < catchMin ? deps[0] : null;
+    const autoNext = deps.find(d => d.mfm - nowMfm >= catchMin) || deps[0];
     const active = pinnedDeparture && deps.some(d => d.mfm === pinnedDeparture.mfm && d.line === pinnedDeparture.line)
       ? pinnedDeparture
       : autoNext;
@@ -1657,7 +1734,7 @@
         tagEl.style.display = '';
 
         const arrivalRow = $('#arrivalRow');
-        const arrival = findRunArrival(active, dayType);
+        const arrival = boardsBeforeDest(active) ? findRunArrival(active, dayType) : null;
         if (arrival){
           arrivalRow.style.display = '';
           $('#arrivalTime').textContent = arrival.label;
@@ -1668,9 +1745,11 @@
           arrivalRow.style.display = 'none';
         }
 
-        const home = (currentDir === 'outbound' && selectedOriginMetro)
-          ? { label: selectedOriginMetro.name }
-          : homeForDirection();
+        const home = herePos
+          ? { label: 'locul în care ești' }
+          : (currentDir === 'outbound' && selectedOriginMetro)
+            ? { label: selectedOriginMetro.name }
+            : homeForDirection();
         const { minutes: walkMin, approx } = walkMinutesForCurrentTrip();
         const leaveMfm = active.mfm - walkMin;
         const leaveRow = $('#leaveRow');
@@ -1681,7 +1760,7 @@
         } else {
           leaveRow.style.display = '';
           $('#leaveTime').textContent = mfmToLabel(leaveMfm);
-          $('#leaveHomeLabel').textContent = 'de la ' + home.label + ' (~' + formatMinutes(walkMin) + ' pe jos' + (approx ? ', estimat' : '') + ')';
+          $('#leaveHomeLabel').textContent = (herePos ? 'din ' : 'de la ') + home.label + ' (~' + formatMinutes(walkMin) + ' pe jos' + (approx ? ', estimat' : '') + ')';
           const diffToLeave = leaveMfm - nowMfm;
           const tier = diffToLeave > 10 ? 'green' : diffToLeave >= 0 ? 'amber' : 'red';
           leaveRow.className = 'leave-row ' + tier;
@@ -1945,14 +2024,176 @@
   // current direction — used by "locate me" so it routes to whichever stop you're actually
   // closest to, not just the one currently selected in the app
   function nearestBusStopForDirection(lat, lon){
-    const key = currentDir === 'outbound' ? 'outboundStops' : 'inboundStops';
-    const merged = dedupeStops(SEGMENT_DATA.lines.map(l => l[key]));
+    return nearestStopOnSide(lat, lon, currentDir);
+  }
+
+  // stația cea mai apropiată de un punct, pe partea de drum a unui sens ('outbound' / 'inbound')
+  function nearestStopOnSide(lat, lon, side){
+    const merged = dedupeStops(SEGMENT_DATA.lines.map(l => l[side === 'outbound' ? 'outboundStops' : 'inboundStops']));
     let best = null, bestD = Infinity;
     merged.forEach(s => {
       const d = haversine(lat, lon, s.lat, s.lon);
       if (d < bestD){ bestD = d; best = s; }
     });
     return best;
+  }
+
+  // ---------- „Unde sunt acum” ----------
+  // următoarele plecări dintr-o stație, pe un sens, de la toate liniile care opresc acolo
+  function departuresAtStop(key, side, dayType){
+    let out = [];
+    SEGMENT_DATA.lines.forEach(line => {
+      const stop = line[side === 'outbound' ? 'outboundStops' : 'inboundStops'].find(s => s.key === key);
+      if (stop) out = out.concat(flatDepartures(stop.schedule[dayType] || {}, line.line).map(d => ({ ...d, towards: side === 'outbound' ? line.terminusDisplay : 'Piața Sudului' })));
+    });
+    return out.sort((a,b) => a.mfm - b.mfm);
+  }
+
+  // numele frumos al unei stații (cu diacritice), din lista de stații a aplicației
+  function stopNiceName(stop){
+    const o = SEGMENT_DATA.stopOptions.find(x => x.key === stop.key);
+    return o ? o.displayName : stop.displayName;
+  }
+
+  // Cât e pornit modul: spre Piața Sudului urci din stația cea mai apropiată de tine;
+  // spre Berceni, destinația rămâne cea aleasă de tine (stația de urcare o dă originStopKey).
+  function syncHereDest(){
+    if (!herePos) return;
+    const inboundStop = nearestStopOnSide(herePos.lat, herePos.lon, 'inbound');
+    const wanted = currentDir === 'inbound' && inboundStop && SEGMENT_DATA.stopOptions.some(o => o.key === inboundStop.key)
+      ? inboundStop.key
+      : (destBeforeHere || DEFAULT_DEST_KEY);
+    if (wanted !== selectedDestKey){
+      selectedDestKey = wanted;
+      $('#altStopSelect').value = selectedDestKey;
+    }
+    updateDestLabels();
+  }
+
+  function renderHereCard(){
+    const card = $('#hereCard');
+    const btn = $('#hereBtn');
+    btn.classList.toggle('on', !!herePos);
+    btn.textContent = herePos ? '📍 Folosesc poziția ta — atinge ca să revii la „de acasă”' : '📍 Unde sunt? Găsește stația cea mai apropiată';
+    if (!herePos){ card.classList.add('hidden'); return; }
+    card.classList.remove('hidden');
+    const nowMfm = currentMinutesFromMidnight();
+    const dayType = todayDayType();
+    const sides = [
+      { side: 'inbound', title: 'Spre Piața Sudului' },
+      { side: 'outbound', title: 'Spre Berceni / Vidra / Mega Parc' },
+    ];
+    let html = '';
+    sides.forEach(({ side, title }, i) => {
+      const stop = nearestStopOnSide(herePos.lat, herePos.lon, side);
+      if (!stop) return;
+      const straight = haversine(herePos.lat, herePos.lon, stop.lat, stop.lon);
+      const w = hereWalk[side] || { minutes: walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon), meters: straight * DETOUR_FACTOR, approx: true };
+      if (i === 0){
+        html += `<div class="here-stop">Cea mai apropiată stație: ${stopNiceName(stop)}</div>
+          <div class="here-sub">~${Math.round(w.meters)} m · ~${formatMinutes(w.minutes)} pe jos${w.approx ? ' (estimat)' : ''}${herePos.accuracy > 80 ? ' · poziție aproximativă (±' + Math.round(herePos.accuracy) + ' m)' : ''}</div>`;
+      }
+      const next = departuresAtStop(stop.key, side, dayType).filter(d => d.mfm >= nowMfm).slice(0, 2);
+      const where = i === 0 ? '' : ` <span class="here-sub">· din ${stopNiceName(stop)}, ~${formatMinutes(w.minutes)} pe jos</span>`;
+      html += `<div class="here-dir"><div class="here-dir-title">${title}${where}</div>`;
+      if (!next.length) html += '<div class="here-none">Nu mai trece niciun autobuz azi.</div>';
+      next.forEach((d, k) => {
+        const diff = d.mfm - nowMfm;
+        const late = diff < w.minutes ? ' · nu-l mai prinzi pe jos' : '';
+        html += `<div class="here-bus">${k === 0 ? 'Primul' : 'Apoi'}: <b>${d.label}</b> linia ${d.line}${side === 'outbound' ? ' → ' + d.towards : ''} <span class="here-sub">${diff === 0 ? 'acum' : 'peste ' + formatMinutes(diff)}${late}</span></div>`;
+      });
+      html += '</div>';
+    });
+    card.innerHTML = html;
+  }
+
+  // drumul real pe jos până la stația fiecărui sens (întâi estimarea în linie dreaptă, apoi ruta)
+  async function refreshHereWalk(){
+    if (!herePos) return;
+    const requestId = ++hereRouteRequestId;
+    const from = herePos;
+    hereWalk = {};
+    for (const side of ['inbound', 'outbound']){
+      const stop = nearestStopOnSide(from.lat, from.lon, side);
+      if (!stop) continue;
+      try {
+        const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${from.lon},${from.lat};${stop.lon},${stop.lat}?overview=false`;
+        const resp = await fetch(url);
+        if (!resp.ok) continue;
+        const route = (await resp.json()).routes?.[0];
+        if (!route || requestId !== hereRouteRequestId) continue;
+        hereWalk[side] = { minutes: Math.max(1, Math.ceil(route.duration / 60)), meters: route.distance, approx: false };
+      } catch (e){ /* fără internet sau fără rută — rămâne estimarea */ }
+    }
+    if (requestId === hereRouteRequestId){ render(); renderHereCard(); }
+  }
+
+  // aplică o poziție nouă: stația de urcare pe sensul spre Piața Sudului devine cea mai apropiată
+  function applyHerePosition(pos){
+    const { latitude, longitude, accuracy } = pos.coords;
+    // mișcările mici (zgomot GPS) nu refac totul
+    if (herePos && haversine(herePos.lat, herePos.lon, latitude, longitude) < 25) return;
+    if (!herePos) destBeforeHere = selectedDestKey;
+    herePos = { lat: latitude, lon: longitude, accuracy: accuracy || 0 };
+    syncHereDest();
+    pinnedDeparture = null;
+    render();
+    renderHereCard();
+    refreshHereWalk();
+    if (map){
+      placeMeMarker(pos);
+      buildDynamicMapLayers();
+      updateWalkRouteLayer();
+    }
+  }
+
+  // Urmărirea continuă nu livrează mereu poziții noi (depinde de telefon și de browser),
+  // așa că, la fiecare reîmprospătare a paginii, cerem și noi poziția o dată.
+  function refreshHerePosition(){
+    if (!herePos || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(applyHerePosition, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 });
+  }
+
+  function stopHere(){
+    if (hereWatchId != null) navigator.geolocation.clearWatch(hereWatchId);
+    hereWatchId = null;
+    herePos = null;
+    hereWalk = {};
+    hereRouteRequestId++;
+    selectedDestKey = destBeforeHere || DEFAULT_DEST_KEY;
+    destBeforeHere = null;
+    $('#altStopSelect').value = selectedDestKey;
+    updateDestLabels();
+    pinnedDeparture = null;
+    render();
+    renderHereCard();
+    if (map){ buildDynamicMapLayers(); updateWalkRouteLayer(); }
+  }
+
+  function toggleHere(){
+    if (herePos || hereWatchId != null) return stopHere();
+    if (!navigator.geolocation){
+      alert('Geolocalizarea nu este disponibilă pe acest dispozitiv/browser.');
+      return;
+    }
+    const btn = $('#hereBtn');
+    btn.classList.add('busy');
+    btn.textContent = '📍 Caut poziția ta…';
+    const onPos = (pos) => { btn.classList.remove('busy'); applyHerePosition(pos); };
+    const startWatch = (highAccuracy) => {
+      hereWatchId = navigator.geolocation.watchPosition(onPos, (err) => {
+        // GPS-ul precis poate eșua în interior — încercăm o dată și poziția mai grosieră, din rețea
+        navigator.geolocation.clearWatch(hereWatchId);
+        hereWatchId = null;
+        if (highAccuracy && !herePos) return startWatch(false);
+        if (!herePos){
+          btn.classList.remove('busy');
+          renderHereCard();
+          alert(geoErrorMessage(err));
+        }
+      }, { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 15000 : 12000, maximumAge: 20000 });
+    };
+    startWatch(true);
   }
 
   function getVar(name){
@@ -1989,6 +2230,7 @@
   // walking origin for the current context: the metro station you picked (if any,
   // outbound only), otherwise the relevant home — mirrors walkMinutesForCurrentTrip()
   function walkOriginCoords(){
+    if (herePos) return { lat: herePos.lat, lon: herePos.lon };
     if (currentDir === 'outbound' && selectedOriginMetro){
       return { lat: selectedOriginMetro.lat, lon: selectedOriginMetro.lon };
     }
@@ -2364,6 +2606,7 @@
     document.querySelectorAll('#dirSwitch button').forEach(btn => {
       btn.addEventListener('click', () => {
         currentDir = btn.dataset.dir;
+        syncHereDest();
         pinnedDeparture = null;
         document.querySelectorAll('#dirSwitch button').forEach(b => b.classList.toggle('active', b === btn));
         render();
@@ -2383,12 +2626,15 @@
       render();
     });
 
+    $('#hereBtn').addEventListener('click', toggleHere);
+
     $('#altStopLink').addEventListener('click', () => {
       $('#altStopPicker').classList.toggle('open');
     });
 
     $('#altStopSelect').addEventListener('change', (e) => {
       selectedDestKey = e.target.value;
+      if (herePos && currentDir === 'outbound') destBeforeHere = selectedDestKey;
       pinnedDeparture = null;
       updateDestLabels();
       render();
@@ -2596,7 +2842,7 @@
     updateCurrentClockHands();
     render();
     tickClock();
-    tickTimer = setInterval(() => { tickClock(); render(); }, 15000);
+    tickTimer = setInterval(() => { tickClock(); render(); renderHereCard(); refreshHerePosition(); }, 15000);
     setInterval(updateCurrentClockHands, 1000);
     renderWeekendNotice();
     loadWeather();
