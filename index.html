@@ -1222,6 +1222,7 @@
   let hereWatchId = null;    // id-ul urmăririi poziției, cât e pornit modul
   let hereWalk = {};         // { outbound: {minutes, meters, approx}, inbound: {...} } până la stația fiecărui sens
   let hereRouteRequestId = 0;
+  let hereBest = {};         // { outbound: stație, inbound: stație } — stația aleasă după drumul real pe jos
   let destBeforeHere = null; // stația aleasă de mână înainte de a porni modul, ca să revenim la ea
   // harta proprie a modului „unde sunt” (separată de harta mare cu traseul)
   const HERE_TILE_KEY = 'berceni-here-basemap';
@@ -1361,11 +1362,9 @@
   // the default (Piața Sudului itself)
   function originStopKey(){
     if (herePos){
-      // lângă Piața Sudului rămâne capătul de linie; altfel, stația cea mai apropiată de tine
-      const ps = SEGMENT_DATA.lines[0].piataSudului;
-      const stop = nearestStopOnSide(herePos.lat, herePos.lon, 'outbound');
-      if (!stop || haversine(herePos.lat, herePos.lon, ps.lat, ps.lon) <= haversine(herePos.lat, herePos.lon, stop.lat, stop.lon)) return null;
-      return stop.key;
+      // lângă Piața Sudului rămâne capătul de linie; altfel, stația la care ajungi cel mai repede
+      const stop = hereStop('outbound');
+      return stop && !stop.isTerminus ? stop.key : null;
     }
     return selectedOriginMetro ? nearestOutboundStopKey(selectedOriginMetro.lat, selectedOriginMetro.lon) : null;
   }
@@ -2095,8 +2094,11 @@
   function departuresAtStop(key, side, dayType){
     let out = [];
     SEGMENT_DATA.lines.forEach(line => {
-      const stop = line[side === 'outbound' ? 'outboundStops' : 'inboundStops'].find(s => s.key === key);
-      if (stop) out = out.concat(flatDepartures(stop.schedule[dayType] || {}, line.line).map(d => ({ ...d, towards: side === 'outbound' ? line.terminusDisplay : 'Piața Sudului' })));
+      // key gol = capătul de linie din Piața Sudului, care are orarul lui separat
+      const sched = key == null
+        ? (side === 'outbound' ? line.piataSuduluiSchedule : null)
+        : (line[side === 'outbound' ? 'outboundStops' : 'inboundStops'].find(s => s.key === key) || {}).schedule;
+      if (sched) out = out.concat(flatDepartures(sched[dayType] || {}, line.line).map(d => ({ ...d, towards: side === 'outbound' ? line.terminusDisplay : 'Piața Sudului' })));
     });
     return out.sort((a,b) => a.mfm - b.mfm);
   }
@@ -2111,7 +2113,7 @@
   // spre Berceni, destinația rămâne cea aleasă de tine (stația de urcare o dă originStopKey).
   function syncHereDest(){
     if (!herePos) return;
-    const inboundStop = nearestStopOnSide(herePos.lat, herePos.lon, 'inbound');
+    const inboundStop = hereStop('inbound');
     const wanted = currentDir === 'inbound' && inboundStop && SEGMENT_DATA.stopOptions.some(o => o.key === inboundStop.key)
       ? inboundStop.key
       : (destBeforeHere || DEFAULT_DEST_KEY);
@@ -2120,6 +2122,30 @@
       $('#altStopSelect').value = selectedDestKey;
     }
     updateDestLabels();
+  }
+
+  // Stația de la care urci, pe un sens: cea la care ajungi cel mai repede pe jos.
+  // Până sosesc rutele reale (sau fără internet), e cea mai apropiată în linie dreaptă.
+  function hereStop(side){
+    if (!herePos) return null;
+    return hereBest[side] || nearbyStopsOnSide(herePos.lat, herePos.lon, side)[0] || null;
+  }
+
+  // cele mai apropiate câteva stații în linie dreaptă, pe un sens — candidatele pentru drumul pe jos
+  const HERE_CANDIDATES = 3;
+  const HERE_CANDIDATE_EXTRA_M = 700; // nu luăm în calcul stații cu mult mai departe decât cea mai apropiată
+  function nearbyStopsOnSide(lat, lon, side){
+    const stops = dedupeStops(SEGMENT_DATA.lines.map(l => l[side === 'outbound' ? 'outboundStops' : 'inboundStops']));
+    // spre Berceni se poate urca și de la capăt, din Piața Sudului, care nu apare în lista de stații
+    if (side === 'outbound'){
+      const ps = SEGMENT_DATA.lines[0].piataSudului;
+      stops.push({ key: null, displayName: 'Piața Sudului', lat: ps.lat, lon: ps.lon, isTerminus: true });
+    }
+    const merged = stops
+      .map(s => ({ stop: s, d: haversine(lat, lon, s.lat, s.lon) }))
+      .sort((a, b) => a.d - b.d);
+    if (!merged.length) return [];
+    return merged.filter(x => x.d <= merged[0].d + HERE_CANDIDATE_EXTRA_M).slice(0, HERE_CANDIDATES).map(x => x.stop);
   }
 
   function renderHereCard(){
@@ -2137,7 +2163,7 @@
     ];
     let html = '';
     sides.forEach(({ side, title }, i) => {
-      const stop = nearestStopOnSide(herePos.lat, herePos.lon, side);
+      const stop = hereStop(side);
       if (!stop) return;
       const straight = haversine(herePos.lat, herePos.lon, stop.lat, stop.lon);
       const w = hereWalk[side] || { minutes: walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon), meters: straight * DETOUR_FACTOR, approx: true };
@@ -2161,30 +2187,48 @@
     card.innerHTML = html;
   }
 
-  // drumul real pe jos până la stația fiecărui sens (întâi estimarea în linie dreaptă, apoi ruta)
+  // Drumul real pe jos: îl cerem pentru cele mai apropiate câteva stații de pe fiecare sens
+  // și o alegem pe cea la care ajungi cel mai repede — nu neapărat cea mai apropiată în
+  // linie dreaptă, dacă până la ea ai de ocolit.
   async function refreshHereWalk(){
     if (!herePos) return;
     const requestId = ++hereRouteRequestId;
     const from = herePos;
     hereWalk = {};
-    for (const side of ['inbound', 'outbound']){
-      const stop = nearestStopOnSide(from.lat, from.lon, side);
-      if (!stop) continue;
-      try {
+    const routes = new Map(); // "lat,lon" → promisiunea rutei; aceeași stație nu se cere de două ori
+    const routeTo = (stop) => {
+      const id = stop.lat + ',' + stop.lon;
+      if (!routes.has(id)){
         const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${from.lon},${from.lat};${stop.lon},${stop.lat}?overview=full&geometries=geojson`;
-        const resp = await fetch(url);
-        if (!resp.ok) continue;
-        const route = (await resp.json()).routes?.[0];
-        if (!route || requestId !== hereRouteRequestId) continue;
-        hereWalk[side] = {
-          minutes: Math.max(1, Math.ceil(route.duration / 60)),
-          meters: route.distance,
-          approx: false,
-          coords: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
-        };
-      } catch (e){ /* fără internet sau fără rută — rămâne estimarea */ }
+        routes.set(id, fetch(url).then(r => r.ok ? r.json() : null).then(d => d && d.routes && d.routes[0] || null).catch(() => null));
+      }
+      return routes.get(id);
+    };
+    const best = {};
+    await Promise.all(['inbound', 'outbound'].map(async (side) => {
+      const candidates = nearbyStopsOnSide(from.lat, from.lon, side);
+      const found = await Promise.all(candidates.map(async (stop) => ({ stop, route: await routeTo(stop) })));
+      const ok = found.filter(x => x.route).sort((a, b) => a.route.duration - b.route.duration);
+      if (!ok.length) return; // fără internet sau fără rută — rămâne estimarea în linie dreaptă
+      best[side] = ok[0];
+    }));
+    if (requestId !== hereRouteRequestId) return; // între timp a venit o poziție mai nouă
+    hereBest = {};
+    for (const side of Object.keys(best)){
+      const { stop, route } = best[side];
+      hereBest[side] = stop;
+      hereWalk[side] = {
+        minutes: Math.max(1, Math.ceil(route.duration / 60)),
+        meters: route.distance,
+        approx: false,
+        coords: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+      };
     }
-    if (requestId === hereRouteRequestId){ render(); renderHereCard(); updateHereMap(true); }
+    syncHereDest(); // stația aleasă se poate schimba față de cea din linie dreaptă
+    render();
+    renderHereCard();
+    updateHereMap(true);
+    if (map){ buildDynamicMapLayers(); updateWalkRouteLayer(); }
   }
 
   // un strat de hartă nou pentru fiecare hartă (același strat nu poate sta pe două hărți)
@@ -2231,11 +2275,11 @@
 
     const bounds = [me];
     const otherSide = currentDir === 'outbound' ? 'inbound' : 'outbound';
-    const other = nearestStopOnSide(herePos.lat, herePos.lon, otherSide);
+    const other = hereStop(otherSide);
     if (other) add(L.marker([other.lat, other.lon], { icon: L.divIcon({ className: '', html: '<div class="here-stop-pin other"></div>', iconSize: [12,12] }) }))
       .bindTooltip(stopNiceName(other) + ' (celălalt sens)', { direction: 'top', className: 'stop-tooltip', offset: [0,-6] });
 
-    const stop = nearestStopOnSide(herePos.lat, herePos.lon, currentDir);
+    const stop = hereStop(currentDir);
     if (stop){
       const w = hereWalk[currentDir];
       // până sosește ruta reală, o linie dreaptă punctată
@@ -2263,6 +2307,7 @@
     if (herePos && haversine(herePos.lat, herePos.lon, latitude, longitude) < 25) return;
     if (!herePos) destBeforeHere = selectedDestKey;
     herePos = { lat: latitude, lon: longitude, accuracy: accuracy || 0 };
+    hereBest = {}; // poziție nouă: până sosesc rutele, lucrăm cu stația cea mai apropiată în linie dreaptă
     syncHereDest();
     pinnedDeparture = null;
     render();
@@ -2288,6 +2333,7 @@
     hereWatchId = null;
     herePos = null;
     hereWalk = {};
+    hereBest = {};
     hereRouteRequestId++;
     selectedDestKey = destBeforeHere || DEFAULT_DEST_KEY;
     destBeforeHere = null;
