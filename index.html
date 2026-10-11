@@ -568,6 +568,39 @@
   .here-card .here-bus b{ font-size:17px; }
   .here-card .here-none{ color:var(--muted); }
 
+  /* harta din modul „unde sunt”: poziția ta, stația și drumul până la ea */
+  .here-map-wrap{
+    margin:8px 0 4px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .here-map-wrap.hidden{ display:none; }
+  .here-map-bar{ display:flex; align-items:center; gap:6px; padding:8px 10px; font-size:13px; color:var(--muted); flex-wrap:wrap; }
+  .here-map-bar button{
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--text);
+    border-radius:999px;
+    padding:4px 11px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .here-map-bar button.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  #hereMap{ height:320px; }
+  .here-map-links{ display:flex; flex-direction:column; gap:6px; padding:9px 12px 11px; font-size:14px; }
+  .here-map-links a{ color:var(--origin-accent); font-weight:600; text-decoration:underline; text-underline-offset:2px; }
+  .here-map-links a.hidden{ display:none; }
+  .here-stop-pin{
+    width:16px; height:16px; border-radius:50%;
+    background:var(--red); border:3px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,0.45);
+  }
+  .here-stop-pin.other{ background:var(--muted); width:12px; height:12px; }
+
   .alt-stop-row{
     margin:-6px 4px 12px;
   }
@@ -1035,6 +1068,19 @@
     <button class="here-btn" id="hereBtn">📍 Unde sunt? Găsește stația cea mai apropiată</button>
   </div>
   <div class="here-card hidden" id="hereCard"></div>
+  <div class="here-map-wrap hidden" id="hereMapWrap">
+    <div class="here-map-bar" id="hereMapBar">
+      <span>Hartă:</span>
+      <button data-tile="osm">OpenStreetMap</button>
+      <button data-tile="google">Google Maps</button>
+      <button data-tile="googleSat">Satelit</button>
+    </div>
+    <div id="hereMap"></div>
+    <div class="here-map-links">
+      <a id="hereGmapsWalk" href="#" target="_blank" rel="noopener">🚶 Deschide drumul pe jos în Google Maps</a>
+      <a id="hereGmapsTransit" class="hidden" href="#" target="_blank" rel="noopener">🚌 Cum ajung la stație cu transportul în comun (Google Maps)</a>
+    </div>
+  </div>
 
   <div class="alt-stop-row">
     <button class="alt-stop-link" id="altStopLink">Altă stație din Berceni ▾</button>
@@ -1177,6 +1223,12 @@
   let hereWalk = {};         // { outbound: {minutes, meters, approx}, inbound: {...} } până la stația fiecărui sens
   let hereRouteRequestId = 0;
   let destBeforeHere = null; // stația aleasă de mână înainte de a porni modul, ca să revenim la ea
+  // harta proprie a modului „unde sunt” (separată de harta mare cu traseul)
+  const HERE_TILE_KEY = 'berceni-here-basemap';
+  const FAR_WALK_MIN = 20;   // peste atât, pe jos nu mai e o variantă bună — oferim și ruta cu transportul în comun
+  let hereMap = null, hereTile = null, hereLayers = [];
+  let hereTileKey = 'osm';
+  try { hereTileKey = localStorage.getItem(HERE_TILE_KEY) || 'osm'; } catch (e) {}
 
   const $ = (sel) => document.querySelector(sel);
 
@@ -2090,8 +2142,10 @@
       const straight = haversine(herePos.lat, herePos.lon, stop.lat, stop.lon);
       const w = hereWalk[side] || { minutes: walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon), meters: straight * DETOUR_FACTOR, approx: true };
       if (i === 0){
+        const dist = w.meters >= 1000 ? (w.meters / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(w.meters) + ' m';
         html += `<div class="here-stop">Cea mai apropiată stație: ${stopNiceName(stop)}</div>
-          <div class="here-sub">~${Math.round(w.meters)} m · ~${formatMinutes(w.minutes)} pe jos${w.approx ? ' (estimat)' : ''}${herePos.accuracy > 80 ? ' · poziție aproximativă (±' + Math.round(herePos.accuracy) + ' m)' : ''}</div>`;
+          <div class="here-sub">~${dist} · ~${formatMinutes(w.minutes)} pe jos${w.approx ? ' (estimat)' : ''}${herePos.accuracy > 80 ? ' · poziție aproximativă (±' + Math.round(herePos.accuracy) + ' m)' : ''}</div>`;
+        if (w.minutes > FAR_WALK_MIN) html += '<div class="here-sub">Ești departe de traseele 438 și 475 — sub hartă ai și ruta cu transportul în comun până la stație.</div>';
       }
       const next = departuresAtStop(stop.key, side, dayType).filter(d => d.mfm >= nowMfm).slice(0, 2);
       const where = i === 0 ? '' : ` <span class="here-sub">· din ${stopNiceName(stop)}, ~${formatMinutes(w.minutes)} pe jos</span>`;
@@ -2117,15 +2171,89 @@
       const stop = nearestStopOnSide(from.lat, from.lon, side);
       if (!stop) continue;
       try {
-        const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${from.lon},${from.lat};${stop.lon},${stop.lat}?overview=false`;
+        const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${from.lon},${from.lat};${stop.lon},${stop.lat}?overview=full&geometries=geojson`;
         const resp = await fetch(url);
         if (!resp.ok) continue;
         const route = (await resp.json()).routes?.[0];
         if (!route || requestId !== hereRouteRequestId) continue;
-        hereWalk[side] = { minutes: Math.max(1, Math.ceil(route.duration / 60)), meters: route.distance, approx: false };
+        hereWalk[side] = {
+          minutes: Math.max(1, Math.ceil(route.duration / 60)),
+          meters: route.distance,
+          approx: false,
+          coords: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+        };
       } catch (e){ /* fără internet sau fără rută — rămâne estimarea */ }
     }
-    if (requestId === hereRouteRequestId){ render(); renderHereCard(); }
+    if (requestId === hereRouteRequestId){ render(); renderHereCard(); updateHereMap(true); }
+  }
+
+  // un strat de hartă nou pentru fiecare hartă (același strat nu poate sta pe două hărți)
+  function makeTileLayer(key){
+    if (key === 'osm') return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' });
+    return L.tileLayer(`https://{s}.google.com/vt/lyrs=${key === 'googleSat' ? 'y' : 'm'}&x={x}&y={y}&z={z}`, {
+      subdomains: ['mt0','mt1','mt2','mt3'], maxZoom: 20, attribution: '&copy; Google Maps',
+    });
+  }
+
+  function setHereTile(key){
+    hereTileKey = key;
+    try { localStorage.setItem(HERE_TILE_KEY, key); } catch (e) {}
+    document.querySelectorAll('#hereMapBar button').forEach(b => b.classList.toggle('active', b.dataset.tile === key));
+    if (!hereMap) return;
+    if (hereTile) hereMap.removeLayer(hereTile);
+    hereTile = makeTileLayer(key).addTo(hereMap);
+    hereTile.bringToBack();
+  }
+
+  // Harta cu poziția ta, stația cea mai apropiată și drumul pe jos până la ea.
+  // `fit` = potrivește încadrarea (la poziție nouă sau când sosește ruta), nu la fiecare redesenare.
+  function updateHereMap(fit){
+    const wrap = $('#hereMapWrap');
+    if (!herePos || typeof L === 'undefined'){ wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    if (!hereMap){
+      hereMap = L.map('hereMap', { zoomControl: true, attributionControl: true });
+      setHereTile(hereTileKey);
+      // traseele celor două linii, subțiri, ca reper
+      SEGMENT_DATA.lines.forEach((line, i) => {
+        L.polyline(line.outboundFull, { color: i === 0 ? getVar('--route-main') : getVar('--route-continue'), weight: 3, opacity: 0.55 }).addTo(hereMap);
+      });
+    }
+    hereMap.invalidateSize();
+    hereLayers.forEach(l => hereMap.removeLayer(l));
+    hereLayers = [];
+    const add = (layer) => { hereLayers.push(layer.addTo(hereMap)); return layer; };
+
+    const me = [herePos.lat, herePos.lon];
+    if (herePos.accuracy > 40) add(L.circle(me, { radius: herePos.accuracy, color: '#1A73E8', weight: 1, fillOpacity: 0.08 }));
+    add(L.marker(me, { icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [22,22] }), zIndexOffset: 1000 }))
+      .bindTooltip('Tu ești aici', { direction: 'top', className: 'stop-tooltip', offset: [0,-10] });
+
+    const bounds = [me];
+    const otherSide = currentDir === 'outbound' ? 'inbound' : 'outbound';
+    const other = nearestStopOnSide(herePos.lat, herePos.lon, otherSide);
+    if (other) add(L.marker([other.lat, other.lon], { icon: L.divIcon({ className: '', html: '<div class="here-stop-pin other"></div>', iconSize: [12,12] }) }))
+      .bindTooltip(stopNiceName(other) + ' (celălalt sens)', { direction: 'top', className: 'stop-tooltip', offset: [0,-6] });
+
+    const stop = nearestStopOnSide(herePos.lat, herePos.lon, currentDir);
+    if (stop){
+      const w = hereWalk[currentDir];
+      // până sosește ruta reală, o linie dreaptă punctată
+      if (w && w.coords) add(L.polyline(w.coords, { color: '#1A73E8', weight: 5, opacity: 0.9 }));
+      else add(L.polyline([me, [stop.lat, stop.lon]], { color: '#1A73E8', weight: 3, dashArray: '2 8' }));
+      add(L.marker([stop.lat, stop.lon], { icon: L.divIcon({ className: '', html: '<div class="here-stop-pin"></div>', iconSize: [16,16] }), zIndexOffset: 900 }))
+        .bindTooltip('🚌 ' + stopNiceName(stop), { permanent: true, direction: 'top', className: 'stop-tooltip', offset: [0,-8] });
+      bounds.push([stop.lat, stop.lon]);
+      if (w && w.coords) w.coords.forEach(c => bounds.push(c));
+
+      const minutes = w ? w.minutes : walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon);
+      const q = `origin=${herePos.lat},${herePos.lon}&destination=${stop.lat},${stop.lon}`;
+      $('#hereGmapsWalk').href = `https://www.google.com/maps/dir/?api=1&${q}&travelmode=walking`;
+      const transit = $('#hereGmapsTransit');
+      transit.href = `https://www.google.com/maps/dir/?api=1&${q}&travelmode=transit`;
+      transit.classList.toggle('hidden', minutes <= FAR_WALK_MIN);
+    }
+    if (fit) hereMap.fitBounds(L.latLngBounds(bounds), { padding: [36,36], maxZoom: 17 });
   }
 
   // aplică o poziție nouă: stația de urcare pe sensul spre Piața Sudului devine cea mai apropiată
@@ -2139,6 +2267,7 @@
     pinnedDeparture = null;
     render();
     renderHereCard();
+    updateHereMap(true);
     refreshHereWalk();
     if (map){
       placeMeMarker(pos);
@@ -2167,6 +2296,7 @@
     pinnedDeparture = null;
     render();
     renderHereCard();
+    updateHereMap(false);
     if (map){ buildDynamicMapLayers(); updateWalkRouteLayer(); }
   }
 
@@ -2610,6 +2740,7 @@
         pinnedDeparture = null;
         document.querySelectorAll('#dirSwitch button').forEach(b => b.classList.toggle('active', b === btn));
         render();
+        updateHereMap(true);
         if (map) buildDynamicMapLayers();
         updateMeLineForCurrentDir();
         updateWalkRouteLayer();
@@ -2627,6 +2758,10 @@
     });
 
     $('#hereBtn').addEventListener('click', toggleHere);
+    document.querySelectorAll('#hereMapBar button').forEach(b => {
+      b.classList.toggle('active', b.dataset.tile === hereTileKey);
+      b.addEventListener('click', () => setHereTile(b.dataset.tile));
+    });
 
     $('#altStopLink').addEventListener('click', () => {
       $('#altStopPicker').classList.toggle('open');
