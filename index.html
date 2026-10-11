@@ -577,7 +577,9 @@
     overflow:hidden;
     box-shadow:var(--shadow);
   }
-  .here-map-wrap.hidden{ display:none; }
+  .here-map-wrap.hidden, .here-map-bar.hidden{ display:none; }
+  #hereModes{ padding:8px 2px 0; }
+  .here-card .here-steps{ margin-top:4px; font-size:13px; }
   .here-map-bar{ display:flex; align-items:center; gap:6px; padding:8px 10px; font-size:13px; color:var(--muted); flex-wrap:wrap; }
   .here-map-bar button{
     border:1px solid var(--line);
@@ -1067,6 +1069,12 @@
   <div class="here-row">
     <button class="here-btn" id="hereBtn">📍 Unde sunt? Găsește stația cea mai apropiată</button>
   </div>
+  <div class="here-map-bar hidden" id="hereModes">
+    <span>Ajung la stație:</span>
+    <button data-mode="walk">🚶 Pe jos</button>
+    <button data-mode="car">🚗 Cu mașina</button>
+    <button data-mode="metro">🚇 Cu metroul</button>
+  </div>
   <div class="here-card hidden" id="hereCard"></div>
   <div class="here-map-wrap hidden" id="hereMapWrap">
     <div class="here-map-bar" id="hereMapBar">
@@ -1222,7 +1230,23 @@
   let hereWatchId = null;    // id-ul urmăririi poziției, cât e pornit modul
   let hereWalk = {};         // { outbound: {minutes, meters, approx}, inbound: {...} } până la stația fiecărui sens
   let hereRouteRequestId = 0;
-  let hereBest = {};         // { outbound: stație, inbound: stație } — stația aleasă după drumul real pe jos
+  let hereBest = {};         // { outbound: stație, inbound: stație } — stația aleasă după drumul real
+  // cum ajungi la stație: 'walk' (pe jos), 'car' (cu mașina) sau 'metro' (cu metroul)
+  const HERE_MODE_KEY = 'berceni-here-mode';
+  let hereMode = 'walk';
+  try { const m = localStorage.getItem(HERE_MODE_KEY); if (['walk','car','metro'].includes(m)) hereMode = m; } catch (e) {}
+  const HERE_HOW = { walk: 'pe jos', car: 'cu mașina', metro: 'cu metroul' };
+
+  // Rețeaua de metrou din București (stații cu coordonate din OpenStreetMap, liniile în ordine,
+  // perechile de stații între care se schimbă pe jos). Folosită doar pentru o estimare:
+  // aplicația nu are orarele metroului, ci socotește cu timpi medii.
+  const METRO = {"stations":{"Universitate":[44.43572,26.10238],"Piața Sudului":[44.39245,26.12284],"Pipera":[44.48061,26.11663],"Aurel Vlaicu":[44.47916,26.10023],"Preciziei":[44.43058,25.99097],"Gara de Nord 1":[44.44724,26.07657],"Izvor":[44.43306,26.08959],"Piața Unirii 1":[44.42753,26.10196],"Timpuri Noi":[44.41696,26.11335],"Dristor 1":[44.41937,26.14046],"Mihai Bravu":[44.41129,26.12589],"Petrache Poenaru":[44.44543,26.04655],"Costin Georgian":[44.43512,26.16913],"Republica":[44.43442,26.18531],"Pantelimon":[44.44052,26.1926],"Nicolae Grigorescu 1":[44.41357,26.16061],"1 Decembrie 1918":[44.41055,26.1738],"Piața Iancului":[44.4417,26.13232],"Piața Victoriei 2":[44.45263,26.08643],"Piața Victoriei 1":[44.45196,26.08708],"Piața Romană":[44.44536,26.0977],"Tineretului":[44.41537,26.10451],"Eroii Revoluției":[44.40378,26.09665],"Aviatorilor":[44.46603,26.08664],"Constantin Brâncoveanu":[44.39865,26.10912],"Apărătorii Patriei":[44.37939,26.13507],"Dimitrie Leonida":[44.36882,26.14358],"Berceni":[44.36127,26.14928],"Grozăvești":[44.44274,26.06036],"Lujerului":[44.43438,26.03258],"Gorjului":[44.43421,26.02128],"Piața Muncii":[44.43183,26.13868],"Ștefan cel Mare":[44.45288,26.10469],"Dristor 2":[44.42048,26.13941],"Crângași":[44.45191,26.04715],"Jiului":[44.48155,26.04154],"Anghel Saligny":[44.40539,26.20892],"Titan":[44.42579,26.16272],"Eroilor":[44.43505,26.07565],"Nicolae Grigorescu 2":[44.41331,26.1609],"Basarab 2":[44.45083,26.06848],"Basarab 1":[44.45075,26.06837],"Gara de Nord 2":[44.44735,26.0738],"Laminorului":[44.49434,26.03195],"Străulești":[44.50166,26.02624],"Politehnica":[44.43528,26.0554],"Grivița":[44.46176,26.0575],"1 Mai":[44.47053,26.05063],"Nicolae Teclu":[44.40729,26.1944],"Obor":[44.44941,26.12461],"Piața Unirii 2":[44.42775,26.10408],"Păcii":[44.43391,26.00413],"Orizont":[44.42587,26.05589],"Favorit":[44.42464,26.04836],"Eroilor 2":[44.43484,26.07384],"Academia Militară":[44.42893,26.06288],"Tudor Vladimirescu":[44.42306,26.0413],"Parc Drumul Taberei":[44.42222,26.03309],"Romancierilor":[44.42299,26.02462],"Râul Doamnei":[44.41524,26.0242],"Constantin Brâncuși":[44.41912,26.02029],"Valea Ialomiței":[44.42111,26.01444],"Tudor Arghezi":[44.34804,26.15926],"Parc Bazilescu":[44.48665,26.03757]},"lines":{"M1":["Pantelimon","Republica","Costin Georgian","Titan","Nicolae Grigorescu 1","Dristor 1","Mihai Bravu","Timpuri Noi","Piața Unirii 1","Izvor","Eroilor","Grozăvești","Petrache Poenaru","Crângași","Basarab 1","Gara de Nord 1","Piața Victoriei 1","Ștefan cel Mare","Obor","Piața Iancului","Piața Muncii","Dristor 2"],"M2":["Pipera","Aurel Vlaicu","Aviatorilor","Piața Victoriei 2","Piața Romană","Universitate","Piața Unirii 2","Tineretului","Eroii Revoluției","Constantin Brâncoveanu","Piața Sudului","Apărătorii Patriei","Dimitrie Leonida","Berceni","Tudor Arghezi"],"M3":["Preciziei","Păcii","Gorjului","Lujerului","Politehnica","Eroilor","Izvor","Piața Unirii 1","Timpuri Noi","Mihai Bravu","Dristor 1","Nicolae Grigorescu 2","1 Decembrie 1918","Nicolae Teclu","Anghel Saligny"],"M4":["Gara de Nord 2","Basarab 2","Grivița","1 Mai","Jiului","Parc Bazilescu","Laminorului","Străulești"],"M5":["Râul Doamnei","Constantin Brâncuși","Romancierilor","Parc Drumul Taberei","Tudor Vladimirescu","Favorit","Orizont","Academia Militară","Eroilor 2"],"M5b":["Valea Ialomiței","Romancierilor"]},"transfers":[["Piața Unirii 1","Piața Unirii 2"],["Piața Victoriei 1","Piața Victoriei 2"],["Dristor 1","Dristor 2"],["Gara de Nord 1","Gara de Nord 2"],["Basarab 1","Basarab 2"],["Eroilor","Eroilor 2"],["Nicolae Grigorescu 1","Nicolae Grigorescu 2"]]};
+  const METRO_SPEED_KMH = 32;     // viteza medie între două stații
+  const METRO_STOP_MIN = 1;       // staționarea într-o stație
+  const METRO_WAIT_MIN = 4;       // așteptarea medie a unui tren
+  const METRO_TRANSFER_MIN = 4;   // mersul pe jos între peroane la schimbarea liniei
+  const METRO_ACCESS_MIN = 2;     // de la stradă la peron (și invers)
+  const METRO_STOP_RADIUS_M = 700; // cât de aproape de o stație de autobuz trebuie să fie gura de metrou
   let destBeforeHere = null; // stația aleasă de mână înainte de a porni modul, ca să revenim la ea
   // harta proprie a modului „unde sunt” (separată de harta mare cu traseul)
   const HERE_TILE_KEY = 'berceni-here-basemap';
@@ -1520,10 +1544,8 @@
   // returns {minutes, approx} — precise traced-path minutes for the default stop, heuristic otherwise
   function walkMinutesForCurrentTrip(){
     if (herePos){
-      const w = hereWalk[currentDir];
-      if (w) return { minutes: w.minutes, approx: w.approx };
-      const stop = originCoords();
-      return { minutes: walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon), approx: true };
+      const w = hereTrip(currentDir);
+      return w ? { minutes: w.minutes, approx: w.approx, how: HERE_HOW[hereMode] } : { minutes: 0, approx: true, how: HERE_HOW[hereMode] };
     }
     if (currentDir === 'outbound' && selectedOriginMetro){
       const stop = originCoords();
@@ -1801,7 +1823,7 @@
           : (currentDir === 'outbound' && selectedOriginMetro)
             ? { label: selectedOriginMetro.name }
             : homeForDirection();
-        const { minutes: walkMin, approx } = walkMinutesForCurrentTrip();
+        const { minutes: walkMin, approx, how = 'pe jos' } = walkMinutesForCurrentTrip();
         const leaveMfm = active.mfm - walkMin;
         const leaveRow = $('#leaveRow');
         if (diff <= 0){
@@ -1811,7 +1833,7 @@
         } else {
           leaveRow.style.display = '';
           $('#leaveTime').textContent = mfmToLabel(leaveMfm);
-          $('#leaveHomeLabel').textContent = (herePos ? 'din ' : 'de la ') + home.label + ' (~' + formatMinutes(walkMin) + ' pe jos' + (approx ? ', estimat' : '') + ')';
+          $('#leaveHomeLabel').textContent = (herePos ? 'din ' : 'de la ') + home.label + ' (~' + formatMinutes(walkMin) + ' ' + how + (approx ? ', estimat' : '') + ')';
           const diffToLeave = leaveMfm - nowMfm;
           const tier = diffToLeave > 10 ? 'green' : diffToLeave >= 0 ? 'amber' : 'red';
           leaveRow.className = 'leave-row ' + tier;
@@ -2151,35 +2173,42 @@
   function renderHereCard(){
     const card = $('#hereCard');
     const btn = $('#hereBtn');
+    $('#hereModes').classList.toggle('hidden', !herePos);
+    document.querySelectorAll('#hereModes button').forEach(b => b.classList.toggle('active', b.dataset.mode === hereMode));
     btn.classList.toggle('on', !!herePos);
     btn.textContent = herePos ? '📍 Folosesc poziția ta — atinge ca să revii la „de acasă”' : '📍 Unde sunt? Găsește stația cea mai apropiată';
     if (!herePos){ card.classList.add('hidden'); return; }
     card.classList.remove('hidden');
     const nowMfm = currentMinutesFromMidnight();
     const dayType = todayDayType();
+    // sensul ales e primul: de el ține stația scrisă sus și drumul de pe hartă
     const sides = [
       { side: 'inbound', title: 'Spre Piața Sudului' },
       { side: 'outbound', title: 'Spre Berceni / Vidra / Mega Parc' },
-    ];
+    ].sort((a, b) => (a.side === currentDir ? 0 : 1) - (b.side === currentDir ? 0 : 1));
     let html = '';
+    const how = HERE_HOW[hereMode];
+    const km = (m) => m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(m) + ' m';
     sides.forEach(({ side, title }, i) => {
       const stop = hereStop(side);
-      if (!stop) return;
-      const straight = haversine(herePos.lat, herePos.lon, stop.lat, stop.lon);
-      const w = hereWalk[side] || { minutes: walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon), meters: straight * DETOUR_FACTOR, approx: true };
+      const w = hereTrip(side);
+      if (!stop || !w) return;
+      const approx = w.approx ? ' (estimat)' : hereMode === 'car' ? ' (fără trafic)' : '';
       if (i === 0){
-        const dist = w.meters >= 1000 ? (w.meters / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(w.meters) + ' m';
-        html += `<div class="here-stop">Cea mai apropiată stație: ${stopNiceName(stop)}</div>
-          <div class="here-sub">~${dist} · ~${formatMinutes(w.minutes)} pe jos${w.approx ? ' (estimat)' : ''}${herePos.accuracy > 80 ? ' · poziție aproximativă (±' + Math.round(herePos.accuracy) + ' m)' : ''}</div>`;
-        if (w.minutes > FAR_WALK_MIN) html += '<div class="here-sub">Ești departe de traseele 438 și 475 — sub hartă ai și ruta cu transportul în comun până la stație.</div>';
+        html += `<div class="here-stop">${hereMode === 'walk' ? 'Cea mai apropiată stație' : 'Stația la care urci'}: ${stopNiceName(stop)}</div>
+          <div class="here-sub">${w.meters != null ? '~' + km(w.meters) + ' · ' : ''}~${formatMinutes(w.minutes)} ${how}${approx}${herePos.accuracy > 80 ? ' · poziție aproximativă (±' + Math.round(herePos.accuracy) + ' m)' : ''}</div>`;
+        if (w.steps) html += `<div class="here-sub here-steps">${w.steps}</div>`;
+        if (w.farFromMetro) html += '<div class="here-sub">Metroul e departe de tine — de aici e mai potrivit pe jos sau cu mașina.</div>';
+        if (hereMode === 'walk' && w.minutes > FAR_WALK_MIN) html += '<div class="here-sub">Ești departe de traseele 438 și 475 — alege mai sus „Cu mașina” sau „Cu metroul”.</div>';
       }
       const next = departuresAtStop(stop.key, side, dayType).filter(d => d.mfm >= nowMfm).slice(0, 2);
-      const where = i === 0 ? '' : ` <span class="here-sub">· din ${stopNiceName(stop)}, ~${formatMinutes(w.minutes)} pe jos</span>`;
+      const where = i === 0 ? '' : ` <span class="here-sub">· din ${stopNiceName(stop)}, ~${formatMinutes(w.minutes)} ${how}</span>`;
       html += `<div class="here-dir"><div class="here-dir-title">${title}${where}</div>`;
+      if (i > 0 && w.steps) html += `<div class="here-sub here-steps">${w.steps}</div>`;
       if (!next.length) html += '<div class="here-none">Nu mai trece niciun autobuz azi.</div>';
       next.forEach((d, k) => {
         const diff = d.mfm - nowMfm;
-        const late = diff < w.minutes ? ' · nu-l mai prinzi pe jos' : '';
+        const late = diff < w.minutes ? ' · nu-l mai prinzi' : '';
         html += `<div class="here-bus">${k === 0 ? 'Primul' : 'Apoi'}: <b>${d.label}</b> linia ${d.line}${side === 'outbound' ? ' → ' + d.towards : ''} <span class="here-sub">${diff === 0 ? 'acum' : 'peste ' + formatMinutes(diff)}${late}</span></div>`;
       });
       html += '</div>';
@@ -2187,48 +2216,227 @@
     card.innerHTML = html;
   }
 
-  // Drumul real pe jos: îl cerem pentru cele mai apropiate câteva stații de pe fiecare sens
-  // și o alegem pe cea la care ajungi cel mai repede — nu neapărat cea mai apropiată în
-  // linie dreaptă, dacă până la ea ai de ocolit.
+  // Drumul până la stația unui sens, în felul ales (pe jos / mașină / metrou). Până sosește
+  // ruta reală (sau fără internet), o estimare în linie dreaptă.
+  function hereTrip(side){
+    if (hereWalk[side]) return hereWalk[side];
+    const stop = hereStop(side);
+    if (!herePos || !stop) return null;
+    const straight = haversine(herePos.lat, herePos.lon, stop.lat, stop.lon);
+    if (hereMode === 'car') return { minutes: Math.max(1, Math.ceil(straight * 1.4 / 1000 / 30 * 60)), meters: straight * 1.4, approx: true };
+    return { minutes: walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon), meters: straight * DETOUR_FACTOR, approx: true };
+  }
+
+  // ---------- metrou: estimare pe rețea ----------
+  let metroGraphCache = null;
+  function metroGraph(){
+    if (metroGraphCache) return metroGraphCache;
+    const adj = {};
+    const link = (a, b, min, line) => {
+      (adj[a] = adj[a] || []).push({ to: b, min, line });
+      (adj[b] = adj[b] || []).push({ to: a, min, line });
+    };
+    Object.entries(METRO.lines).forEach(([line, names]) => {
+      for (let i = 0; i < names.length - 1; i++){
+        const a = METRO.stations[names[i]], b = METRO.stations[names[i + 1]];
+        link(names[i], names[i + 1], METRO_STOP_MIN + haversine(a[0], a[1], b[0], b[1]) / 1000 / METRO_SPEED_KMH * 60, line.replace('b', ''));
+      }
+    });
+    METRO.transfers.forEach(([a, b]) => link(a, b, METRO_TRANSFER_MIN + METRO_WAIT_MIN, 'schimb'));
+    return (metroGraphCache = adj);
+  }
+
+  // cel mai scurt drum cu metroul de la o poziție: întoarce, pentru fiecare stație, minutele
+  // până acolo (cu tot cu mersul pe jos până la metrou și așteptarea) și stația dinainte
+  function metroFrom(lat, lon){
+    const adj = metroGraph();
+    const dist = {}, prev = {}, via = {}, done = new Set();
+    Object.entries(METRO.stations)
+      .map(([name, c]) => ({ name, walk: walkMinutes(lat, lon, c[0], c[1]) }))
+      .sort((a, b) => a.walk - b.walk).slice(0, 3)
+      .forEach(e => { dist[e.name] = e.walk + METRO_ACCESS_MIN + METRO_WAIT_MIN; prev[e.name] = null; });
+    for (;;){
+      let cur = null;
+      for (const n in dist) if (!done.has(n) && (cur === null || dist[n] < dist[cur])) cur = n;
+      if (cur === null) break;
+      done.add(cur);
+      for (const e of adj[cur] || []){
+        // schimbarea liniei în aceeași stație (ex. M1 → M4 la Gara de Nord) e modelată prin
+        // perechile de peroane; pe trunchiul comun M1/M3 nu se plătește nimic în plus
+        const d = dist[cur] + e.min;
+        if (dist[e.to] === undefined || d < dist[e.to]){ dist[e.to] = d; prev[e.to] = cur; via[e.to] = e.line; }
+      }
+    }
+    return { dist, prev, via };
+  }
+
+  // drumul până la o stație de metrou, ca listă de stații și ca text („M3 Timpuri Noi → Piața Unirii 1 · schimbi · M2 → Piața Sudului”)
+  function metroPath(res, target){
+    const names = [];
+    for (let n = target; n != null; n = res.prev[n]) names.unshift(n);
+    const parts = [];
+    let segLine = null, segFrom = names[0];
+    for (let i = 1; i < names.length; i++){
+      const line = res.via[names[i]];
+      if (line !== segLine){
+        if (segLine && segLine !== 'schimb') parts.push(`${segLine}: ${segFrom} → ${names[i - 1]}`);
+        segLine = line; segFrom = names[i - 1];
+      }
+    }
+    if (segLine && segLine !== 'schimb') parts.push(`${segLine}: ${segFrom} → ${names[names.length - 1]}`);
+    return { names, text: parts.join(' · schimbi · ') };
+  }
+
+  // stațiile de autobuz la care se poate ajunge cu metroul, pe un sens: câte una lângă
+  // fiecare stație de metrou din apropierea traseului
+  function metroBoardingCandidates(side){
+    const stops = dedupeStops(SEGMENT_DATA.lines.map(l => l[side === 'outbound' ? 'outboundStops' : 'inboundStops']));
+    if (side === 'outbound'){
+      const ps = SEGMENT_DATA.lines[0].piataSudului;
+      stops.push({ key: null, displayName: 'Piața Sudului', lat: ps.lat, lon: ps.lon, isTerminus: true });
+    }
+    const out = [];
+    Object.entries(METRO.stations).forEach(([name, c]) => {
+      let best = null, bestD = Infinity;
+      stops.forEach(s => { const d = haversine(c[0], c[1], s.lat, s.lon); if (d < bestD){ bestD = d; best = s; } });
+      if (best && bestD <= METRO_STOP_RADIUS_M) out.push({ metro: name, stop: best, egressMin: METRO_ACCESS_MIN + walkMinutes(c[0], c[1], best.lat, best.lon) });
+    });
+    return out;
+  }
+
+  // când ajungi la destinație dacă urci dintr-o stație anume, fiind gata de urcare la `readyMfm`
+  function arrivalVia(side, stop, readyMfm, dayType){
+    const destKey = destBeforeHere || DEFAULT_DEST_KEY;
+    let best = null;
+    SEGMENT_DATA.lines.forEach(line => {
+      let depSched, arrSched;
+      if (side === 'outbound'){
+        const dest = line.outboundStops.find(s => s.key === destKey);
+        const from = stop.isTerminus ? { order: -1, schedule: line.piataSuduluiSchedule } : line.outboundStops.find(s => s.key === stop.key);
+        if (!dest || !from || from.order >= dest.order) return;
+        depSched = from.schedule; arrSched = dest.schedule;
+      } else {
+        const from = line.inboundStops.find(s => s.key === stop.key);
+        if (!from) return;
+        depSched = from.schedule; arrSched = line.piataSuduluiArrivalSchedule;
+      }
+      const deps = flatDepartures(depSched[dayType] || {}, line.line).sort((a, b) => a.mfm - b.mfm);
+      const idx = deps.findIndex(d => d.mfm >= readyMfm);
+      const arrs = flatDepartures(arrSched[dayType] || {}, line.line).sort((a, b) => a.mfm - b.mfm);
+      if (idx < 0 || !arrs.length) return;
+      const arr = arrs[Math.min(idx, arrs.length - 1)].mfm;
+      if (best === null || arr < best) best = arr;
+    });
+    return best;
+  }
+
+  // metrou: dintre stațiile la care te poate duce metroul, cea de la care ajungi cel mai devreme
+  // la destinație (de obicei mergi cu metroul cât de departe are rost, apoi iei autobuzul)
+  function computeMetroTrips(){
+    const res = metroFrom(herePos.lat, herePos.lon);
+    const nowMfm = currentMinutesFromMidnight();
+    const dayType = todayDayType();
+    const best = {};
+    ['inbound', 'outbound'].forEach(side => {
+      let pick = null;
+      metroBoardingCandidates(side).forEach(c => {
+        if (res.dist[c.metro] === undefined) return;
+        const minutes = Math.ceil(res.dist[c.metro] + c.egressMin);
+        const arrival = arrivalVia(side, c.stop, nowMfm + minutes, dayType);
+        const better = !pick
+          || (arrival != null && (pick.arrival == null || arrival < pick.arrival))
+          || (arrival === pick.arrival && minutes < pick.minutes);
+        if (better) pick = { ...c, minutes, arrival };
+      });
+      if (!pick) return;
+      const path = metroPath(res, pick.metro);
+      const entry = METRO.stations[path.names[0]];
+      const walkIn = walkMinutes(herePos.lat, herePos.lon, entry[0], entry[1]);
+      best[side] = {
+        stop: pick.stop,
+        trip: {
+          minutes: pick.minutes,
+          meters: null,
+          approx: true,
+          farFromMetro: walkIn > FAR_WALK_MIN,
+          steps: `🚶 ${formatMinutes(walkIn)} până la metrou ${path.names[0]}`
+            + (path.text ? ` · 🚇 ${path.text}` : '')
+            + ` · 🚶 ${formatMinutes(Math.max(1, Math.round(pick.egressMin - METRO_ACCESS_MIN)))} până la stația de autobuz`,
+          segments: [
+            { coords: [[herePos.lat, herePos.lon], entry], walk: true },
+            { coords: path.names.map(n => METRO.stations[n]) },
+            { coords: [METRO.stations[pick.metro], [pick.stop.lat, pick.stop.lon]], walk: true },
+          ],
+        },
+      };
+    });
+    return best;
+  }
+
+  // Calculează drumul până la stație, în felul ales. Pe jos și cu mașina: cere ruta reală
+  // pentru cele mai apropiate câteva stații de pe fiecare sens și o alege pe cea la care
+  // ajungi cel mai repede (nu neapărat cea mai apropiată în linie dreaptă).
   async function refreshHereWalk(){
     if (!herePos) return;
     const requestId = ++hereRouteRequestId;
     const from = herePos;
     hereWalk = {};
-    const routes = new Map(); // "lat,lon" → promisiunea rutei; aceeași stație nu se cere de două ori
-    const routeTo = (stop) => {
-      const id = stop.lat + ',' + stop.lon;
-      if (!routes.has(id)){
-        const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${from.lon},${from.lat};${stop.lon},${stop.lat}?overview=full&geometries=geojson`;
-        routes.set(id, fetch(url).then(r => r.ok ? r.json() : null).then(d => d && d.routes && d.routes[0] || null).catch(() => null));
-      }
-      return routes.get(id);
-    };
-    const best = {};
-    await Promise.all(['inbound', 'outbound'].map(async (side) => {
-      const candidates = nearbyStopsOnSide(from.lat, from.lon, side);
-      const found = await Promise.all(candidates.map(async (stop) => ({ stop, route: await routeTo(stop) })));
-      const ok = found.filter(x => x.route).sort((a, b) => a.route.duration - b.route.duration);
-      if (!ok.length) return; // fără internet sau fără rută — rămâne estimarea în linie dreaptă
-      best[side] = ok[0];
-    }));
-    if (requestId !== hereRouteRequestId) return; // între timp a venit o poziție mai nouă
-    hereBest = {};
-    for (const side of Object.keys(best)){
-      const { stop, route } = best[side];
-      hereBest[side] = stop;
-      hereWalk[side] = {
-        minutes: Math.max(1, Math.ceil(route.duration / 60)),
-        meters: route.distance,
-        approx: false,
-        coords: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+    const found = {};
+    if (hereMode === 'metro'){
+      Object.entries(computeMetroTrips()).forEach(([side, b]) => { found[side] = b; });
+    } else {
+      const profile = hereMode === 'car' ? 'routed-car/route/v1/driving' : 'routed-foot/route/v1/foot';
+      const routes = new Map(); // "lat,lon" → promisiunea rutei; aceeași stație nu se cere de două ori
+      const routeTo = (stop) => {
+        const id = stop.lat + ',' + stop.lon;
+        if (!routes.has(id)){
+          const url = `https://routing.openstreetmap.de/${profile}/${from.lon},${from.lat};${stop.lon},${stop.lat}?overview=full&geometries=geojson`;
+          routes.set(id, fetch(url).then(r => r.ok ? r.json() : null).then(d => d && d.routes && d.routes[0] || null).catch(() => null));
+        }
+        return routes.get(id);
       };
+      await Promise.all(['inbound', 'outbound'].map(async (side) => {
+        const candidates = nearbyStopsOnSide(from.lat, from.lon, side);
+        const got = await Promise.all(candidates.map(async (stop) => ({ stop, route: await routeTo(stop) })));
+        const ok = got.filter(x => x.route).sort((a, b) => a.route.duration - b.route.duration);
+        if (!ok.length) return; // fără internet sau fără rută — rămâne estimarea în linie dreaptă
+        const { stop, route } = ok[0];
+        found[side] = {
+          stop,
+          trip: {
+            minutes: Math.max(1, Math.ceil(route.duration / 60)),
+            meters: route.distance,
+            approx: false,
+            coords: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+          },
+        };
+      }));
+    }
+    if (requestId !== hereRouteRequestId) return; // între timp a venit o poziție mai nouă sau s-a schimbat felul
+    hereBest = {};
+    for (const side of Object.keys(found)){
+      hereBest[side] = found[side].stop;
+      hereWalk[side] = found[side].trip;
     }
     syncHereDest(); // stația aleasă se poate schimba față de cea din linie dreaptă
     render();
     renderHereCard();
     updateHereMap(true);
     if (map){ buildDynamicMapLayers(); updateWalkRouteLayer(); }
+  }
+
+  function setHereMode(mode){
+    if (mode === hereMode) return;
+    hereMode = mode;
+    try { localStorage.setItem(HERE_MODE_KEY, mode); } catch (e) {}
+    hereBest = {};
+    hereWalk = {};
+    syncHereDest();
+    pinnedDeparture = null;
+    render();
+    renderHereCard();
+    updateHereMap(true);
+    refreshHereWalk();
   }
 
   // un strat de hartă nou pentru fiecare hartă (același strat nu poate sta pe două hărți)
@@ -2282,20 +2490,27 @@
     const stop = hereStop(currentDir);
     if (stop){
       const w = hereWalk[currentDir];
-      // până sosește ruta reală, o linie dreaptă punctată
-      if (w && w.coords) add(L.polyline(w.coords, { color: '#1A73E8', weight: 5, opacity: 0.9 }));
-      else add(L.polyline([me, [stop.lat, stop.lon]], { color: '#1A73E8', weight: 3, dashArray: '2 8' }));
+      const routeColor = hereMode === 'car' ? '#7B3FE4' : '#1A73E8';
+      // metrou: mersul pe jos punctat, drumul cu metroul plin; altfel ruta reală;
+      // până sosește ruta, o linie dreaptă punctată
+      if (w && w.segments) w.segments.forEach(seg => add(L.polyline(seg.coords, seg.walk
+        ? { color: '#1A73E8', weight: 3, dashArray: '2 8' }
+        : { color: '#E8590C', weight: 5, opacity: 0.9 })));
+      else if (w && w.coords) add(L.polyline(w.coords, { color: routeColor, weight: 5, opacity: 0.9 }));
+      else add(L.polyline([me, [stop.lat, stop.lon]], { color: routeColor, weight: 3, dashArray: '2 8' }));
       add(L.marker([stop.lat, stop.lon], { icon: L.divIcon({ className: '', html: '<div class="here-stop-pin"></div>', iconSize: [16,16] }), zIndexOffset: 900 }))
         .bindTooltip('🚌 ' + stopNiceName(stop), { permanent: true, direction: 'top', className: 'stop-tooltip', offset: [0,-8] });
       bounds.push([stop.lat, stop.lon]);
       if (w && w.coords) w.coords.forEach(c => bounds.push(c));
+      if (w && w.segments) w.segments.forEach(seg => seg.coords.forEach(c => bounds.push(c)));
 
-      const minutes = w ? w.minutes : walkMinutes(herePos.lat, herePos.lon, stop.lat, stop.lon);
+      // linkul principal deschide în Google Maps ruta în felul ales (acolo sunt și traficul și orarele)
       const q = `origin=${herePos.lat},${herePos.lon}&destination=${stop.lat},${stop.lon}`;
-      $('#hereGmapsWalk').href = `https://www.google.com/maps/dir/?api=1&${q}&travelmode=walking`;
-      const transit = $('#hereGmapsTransit');
-      transit.href = `https://www.google.com/maps/dir/?api=1&${q}&travelmode=transit`;
-      transit.classList.toggle('hidden', minutes <= FAR_WALK_MIN);
+      const main = $('#hereGmapsWalk');
+      const gm = { walk: ['walking', '🚶 Deschide drumul pe jos în Google Maps'], car: ['driving', '🚗 Deschide ruta cu mașina în Google Maps (cu trafic)'], metro: ['transit', '🚇 Vezi ruta exactă cu transportul în comun în Google Maps'] }[hereMode];
+      main.href = `https://www.google.com/maps/dir/?api=1&${q}&travelmode=${gm[0]}`;
+      main.textContent = gm[1];
+      $('#hereGmapsTransit').classList.add('hidden');
     }
     if (fit) hereMap.fitBounds(L.latLngBounds(bounds), { padding: [36,36], maxZoom: 17 });
   }
@@ -2786,6 +3001,7 @@
         pinnedDeparture = null;
         document.querySelectorAll('#dirSwitch button').forEach(b => b.classList.toggle('active', b === btn));
         render();
+        renderHereCard();
         updateHereMap(true);
         if (map) buildDynamicMapLayers();
         updateMeLineForCurrentDir();
@@ -2804,6 +3020,7 @@
     });
 
     $('#hereBtn').addEventListener('click', toggleHere);
+    document.querySelectorAll('#hereModes button').forEach(b => b.addEventListener('click', () => setHereMode(b.dataset.mode)));
     document.querySelectorAll('#hereMapBar button').forEach(b => {
       b.classList.toggle('active', b.dataset.tile === hereTileKey);
       b.addEventListener('click', () => setHereTile(b.dataset.tile));
